@@ -107,8 +107,9 @@ _PLAYER_HTML = """<!doctype html>
 <script type="text/plain" id="code">__CODE_RAW__</script>
 <script>
   const ed = document.getElementById('ed');
-  document.getElementById('play').onclick = () => ed.start();
-  document.getElementById('stop').onclick = () => ed.stop();
+  const repl = () => ed.editor ?? ed;            // StrudelMirror: evaluate / stop / setCode
+  document.getElementById('play').onclick = () => repl().evaluate();
+  document.getElementById('stop').onclick = () => { try { repl().stop(); } catch {} };
   document.getElementById('copy').onclick = async () => {
     const code = ed.code ?? document.getElementById('code').textContent;
     try { await navigator.clipboard.writeText(code); flash('✓ COPIADO'); }
