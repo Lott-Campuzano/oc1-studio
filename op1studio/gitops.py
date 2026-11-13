@@ -57,6 +57,8 @@ def add_all(path: Path) -> None:
 
 
 def commit(path: Path, msg: str) -> str:
+    if not status(path):
+        return "sin cambios que guardar"
     add_all(path)
     out = _run(["commit", "-m", msg], path)
     return out.splitlines()[0] if out else "sin cambios que guardar"
