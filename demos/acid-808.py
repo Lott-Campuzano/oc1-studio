@@ -42,11 +42,6 @@ demo = Demo(
             pattern="~ ~ a4 ~ ~ ~ e5 ~ ~ ~ c5 ~ ~ ~ a4 ~",
             gain=0.45,
         ),
-        Track(
-            name="syn6", sound="saw",
-            pattern="c3 ~ e3 ~ g3 ~",
-            gain=0.8,
-        ),
     ],
     fx={"reverb": 0.18, "delay": 0.12, "drive": 0.08, "volume": 0.9},
 )

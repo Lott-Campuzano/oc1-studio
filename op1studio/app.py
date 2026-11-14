@@ -21,7 +21,8 @@ from textual.widgets import (Button, Checkbox, DataTable, Footer, Input, Label,
                              ListItem, ListView, Log, RadioButton, RadioSet, Static)
 
 from . import demo as demoio
-from . import gitops, settings, theme
+from . import gitops, settings, system_theme, theme
+from . import live_bridge
 from . import strudel as strudelio
 from . import synth
 from .demo import DemoError, slugify
@@ -63,7 +64,7 @@ class TopBar(Static):
     """Barra superior estilo OP-1: punto de color + estado."""
 
     def update_state(self, app: "OP1App") -> None:
-        accent = theme.ACCENTS.get(app.theme.replace("op1-", ""), "#ff5300")
+        accent = theme.ACCENTS.get(theme.accent_of(app.theme), "#ff5300")
         t = app.demo
         state = "▶" if app._playing else "■"
         txt = Text()
@@ -73,7 +74,16 @@ class TopBar(Static):
         txt.append(f"   ·   {t.bpm:g} BPM", style=Style(color="#e8e6e3"))
         txt.append(f"   ·   {t.key} {t.scale}", style=Style(color="#9a9a9a"))
         txt.append(f"   ·   {state}", style=Style(color=accent, bold=True))
-        txt.append(f"   ·   {app.theme}", style=Style(color="#6a6a6a"))
+        txt.append(f"   ·   {theme.accent_of(app.theme)}"
+                   f"{'/claro' if 'light' in app.theme else ''}",
+                   style=Style(color="#6a6a6a"))
+        if app._bridge is not None:
+            live_ok = app._bridge.alive_clock
+            txt.append("   ·   LIVE", style=Style(
+                color="#00d26a" if live_ok else "#8a8a8a", bold=True))
+            if live_ok and app._live_step >= 0:
+                txt.append(f" {app._live_step + 1:02d}/{t.steps}",
+                           style=Style(color="#00d26a"))
         self.update(txt)
 
 
@@ -278,7 +288,7 @@ class GitScreen(ModalScreen):
 
 
 class SettingsScreen(ModalScreen):
-    """Ajustes: color de acento, auto-commit, carpeta de demos."""
+    """Ajustes: apariencia (sistema), color de acento, auto-commit, puertos LIVE."""
 
     BINDINGS = [Binding("escape", "close", "CERRAR")]
 
@@ -286,28 +296,51 @@ class SettingsScreen(ModalScreen):
         cfg = settings.load()
         with Vertical(id="dialog"):
             yield Static("AJUSTES", classes="modal-title label-blue")
+            yield Static("APARIENCIA ('auto' sigue al sistema):", classes="hint")
+            with RadioSet(id="mode-set"):
+                for label, val in (("auto (sistema)", "auto"), ("oscuro", "dark"), ("claro", "light")):
+                    yield RadioButton(label, value=(cfg.get("appearance", "auto") == val),
+                                      id=f"md-{val}")
             yield Static("COLOR (estilo OP-1):", classes="hint")
             with RadioSet(id="theme-set"):
-                for name in theme.THEMES:
-                    yield RadioButton(name.replace("op1-", ""), value=(name == cfg.get("accent")),
-                                      id=f"th-{name}")
+                for key in theme.ACCENTS:
+                    yield RadioButton(key, value=(cfg.get("accent", "orange") == key),
+                                      id=f"ac-{key}")
             yield Checkbox("auto-commit en git al guardar [s]",
                            value=bool(cfg.get("auto_commit")), id="opt-autocommit")
-            yield Static("CARPETA DE DEMOS (⏎ para guardar):", classes="hint")
+            yield Static("CARPETA DE DEMOS (⏎ guarda):", classes="hint")
             yield Input(value=str(cfg.get("demo_dir", "demos")), id="opt-demodir")
+            yield Static("PUERTOS LIVE (⏎ guarda · reinicia LIVE con v):", classes="hint")
+            with Horizontal(classes="btnrow"):
+                yield Input(value=str(cfg.get("live_send_port", 7647)),
+                            id="opt-send", classes="tin")
+                yield Input(value=str(cfg.get("live_recv_port", 7648)),
+                            id="opt-recv", classes="tin")
             yield Button("CERRAR esc", id="set-close", classes="btn b-white")
 
     def on_radio_set_changed(self, event: RadioSet.Changed) -> None:
-        name = (event.pressed.id or "")[3:] or "op1-orange"
-        self.app.apply_theme(name)
+        rid = event.pressed.id or ""
+        if rid.startswith("md-"):
+            self.app.set_appearance(rid[3:])
+        elif rid.startswith("ac-"):
+            self.app.set_accent(rid[3:])
 
     def on_checkbox_changed(self, event: Checkbox.Changed) -> None:
         settings.update(auto_commit=event.value)
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
-        if event.input.id == "opt-demodir":
+        iid = event.input.id or ""
+        if iid == "opt-demodir":
             settings.update(demo_dir=event.value.strip() or "demos")
             self.app.notify(f"● carpeta de demos: {event.value}")
+        elif iid in ("opt-send", "opt-recv"):
+            try:
+                port = int(event.value)
+                key = "live_send_port" if iid == "opt-send" else "live_recv_port"
+                settings.update(**{key: max(1024, min(65535, port))})
+                self.app.notify(f"● {key}: {port} (reinicia LIVE con v)")
+            except ValueError:
+                self.app.notify("✗ puerto no válido", severity="error")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         self.app.pop_screen()
@@ -515,6 +548,7 @@ class OP1App(App):
         Binding("d", "del_track", "–TRACK"),
         Binding("t", "cycle_preset", "PRESET"),
         Binding("c", "cycle_theme", "COLOR"),
+        Binding("v", "toggle_live", "LIVE"),
         Binding("q", "quit", "SALIR"),
         Binding("ctrl+s", "save", "GUARDAR", show=False),
         Binding("ctrl+q", "quit", "SALIR", show=False),
@@ -529,6 +563,8 @@ class OP1App(App):
         self._play_id = 0
         self._server: strudelio.StrudelServer | None = None
         self._preset_i = 0
+        self._bridge: live_bridge.LiveBridge | None = None
+        self._live_step = -1
         self.main_screen: StudioScreen | None = None
 
     # ---- ciclo de vida
@@ -540,8 +576,45 @@ class OP1App(App):
     def on_mount(self) -> None:
         for t in theme.THEMES.values():
             self.register_theme(t)
-        accent = settings.get("accent", "op1-orange")
-        self.theme = accent if accent in theme.THEMES else "op1-orange"
+        cfg = settings.load()
+        self._accent = str(cfg.get("accent", "orange"))
+        self._appearance = str(cfg.get("appearance", "auto"))
+        self.theme = self._theme_name()
+        # temas dinámicos: sondea la apariencia del sistema cada 5 s
+        self.set_interval(5.0, self._check_system_theme)
+
+    def _theme_name(self) -> str:
+        mode = self._appearance
+        if mode == "auto":
+            mode = system_theme.detect_system_mode()
+        return theme.effective_theme(self._accent, mode)
+
+    def reapply_theme(self) -> None:
+        self.theme = self._theme_name()
+        settings.update(appearance=self._appearance, accent=self._accent)
+        if self.main_screen is not None:
+            self.main_screen.update_topbar()
+
+    def _check_system_theme(self) -> None:
+        if self._appearance != "auto":
+            return
+        system_theme.invalidate_cache()
+        name = self._theme_name()
+        if name != self.theme:
+            self.theme = name
+            self.notify(f"● tema del sistema: {'claro' if 'light' in name else 'oscuro'}")
+            if self.main_screen is not None:
+                self.main_screen.update_topbar()
+
+    def set_appearance(self, mode: str) -> None:
+        if mode in ("auto", "dark", "light"):
+            self._appearance = mode
+            self.reapply_theme()
+
+    def set_accent(self, key: str) -> None:
+        if key in theme.ACCENTS:
+            self._accent = key
+            self.reapply_theme()
 
     def on_unmount(self) -> None:
         self._teardown()
@@ -553,6 +626,9 @@ class OP1App(App):
         if self._server is not None:
             self._server.stop()
             self._server = None
+        if self._bridge is not None:
+            self._bridge.stop()
+            self._bridge = None
 
     def action_quit(self) -> None:
         self._teardown()
@@ -576,12 +652,11 @@ class OP1App(App):
         if self.main_screen is not None:
             self.main_screen.refresh_sdx()
 
-    def apply_theme(self, name: str) -> None:
-        if name in theme.THEMES:
-            self.theme = name
-            settings.update(accent=name)
-            if self.main_screen is not None:
-                self.main_screen.update_topbar()
+    def _sync_bridge(self) -> None:
+        """Mantén el puente LIVE al día tras cargar/guardar un demo."""
+        if self._bridge is not None:
+            self._bridge.demo = self.demo
+            self._bridge.send_bpm()
 
     # ---- acciones
 
@@ -631,6 +706,7 @@ class OP1App(App):
             return
         self.demo_path = Path(path)
         self.notify(f"● guardado → {path.name}")
+        self._sync_bridge()
         if settings.get("auto_commit") and gitops.is_repo(self.workspace):
             def work() -> None:
                 out = gitops.auto_commit(self.workspace, self.demo.title)
@@ -651,6 +727,7 @@ class OP1App(App):
         self.demo = d
         self.demo_path = Path(path)
         self.pop_screen()  # cierra el modal
+        self._sync_bridge()
         if self.main_screen is not None:
             self.main_screen.refresh_all()
         self.notify(f"● {d.title} cargado")
@@ -700,10 +777,43 @@ class OP1App(App):
         self.notify(f"● preset → {p['name']} (pista {t.name})")
 
     def action_cycle_theme(self) -> None:
-        names = list(theme.THEMES)
+        names = list(theme.ACCENTS)
         try:
-            i = (names.index(self.theme) + 1) % len(names)
-        except ValueError:
+            i = (names.index(self._accent) + 1) % len(names)
+        except (ValueError, AttributeError):
             i = 0
-        self.apply_theme(names[i])
-        self.notify(f"● color: {names[i].replace('op1-', '')}")
+        self.set_accent(names[i])
+        self.notify(f"● color: {names[i]}")
+
+    # ---- LIVE (Ableton / Max for Live)
+
+    def action_toggle_live(self) -> None:
+        if self._bridge is not None:
+            self._bridge.stop()
+            self._bridge = None
+            self._live_step = -1
+            self.notify("■ LIVE apagado ( Ableton desconectado )")
+        else:
+            cfg = settings.load()
+            self._bridge = live_bridge.LiveBridge(
+                self.demo,
+                send_port=int(cfg.get("live_send_port", 7647)),
+                recv_port=int(cfg.get("live_recv_port", 7648)),
+                on_clock=self._on_live_clock,
+            )
+            self._bridge.start()
+            self.notify(f"● LIVE: notas → 127.0.0.1:{cfg.get('live_send_port', 7647)}"
+                        f" · reloj ← :{cfg.get('live_recv_port', 7648)}  (dale play en Ableton)")
+        if self.main_screen is not None:
+            self.main_screen.update_topbar()
+
+    def _on_live_clock(self, step: int) -> None:
+        """Hilo del puente: envía las notas del paso y actualiza la UI."""
+        if self._bridge is not None:
+            self._bridge.send_step(step)
+        self.call_from_thread(self._live_step_ui, step)
+
+    def _live_step_ui(self, step: int) -> None:
+        self._live_step = step
+        if self.main_screen is not None:
+            self.main_screen.update_topbar()

@@ -15,8 +15,12 @@ from urllib.parse import quote
 
 from .demo import Demo, DRUM_SOUNDS
 
+DRUM_MAP = {"kick": "bd", "snare": "sn", "hat": "hh", "clap": "cp",
+            "ride": "rd", "tom": "lt", "rim": "rs", "perc": "perc"}
 SOUND_MAP = {"sine": "sine", "square": "square", "saw": "sawtooth", "tri": "triangle",
              "pluck": "sine", "bell": "triangle", "fm": "sawtooth", "noise": "noise"}
+CHIP_MAP = {"sine": "triangle", "square": "square", "saw": "square", "tri": "triangle",
+            "pluck": "square", "bell": "triangle", "fm": "square", "noise": "noise"}
 DRUM_MAP = {"kick": "bd", "snare": "sn", "hat": "hh", "clap": "cp",
             "ride": "rd", "tom": "lt", "rim": "rs", "perc": "perc"}
 
@@ -37,6 +41,7 @@ def _mini(pattern: str, drum: bool = False) -> str:
 def to_strudel(demo: Demo) -> str:
     """Genera el código Strudel equivalente al demo."""
     d = demo.normalized()
+    chip = d.style == "chip"
     lines = [f"setcpm({d.bpm:g}/4)"]
     fx = d.fx
     room = fx.get("reverb", 0.0)
@@ -47,9 +52,14 @@ def to_strudel(demo: Demo) -> str:
         parts = []
         if drum:
             parts.append(f's("{pat}")')
+            if chip:
+                parts.append(".coarse(12)")
         else:
             parts.append(f'note("{pat}")')
-            parts.append(f'.s("{SOUND_MAP.get(t.sound, "square")}")')
+            sound = CHIP_MAP.get(t.sound, "square") if chip else SOUND_MAP.get(t.sound, "square")
+            parts.append(f'.s("{sound}")')
+            if chip:  # computadora vieja: menos bits, reloj más tosco
+                parts.append(".coarse(8).crush(4)")
         if t.gain != 1.0:
             parts.append(f".gain({t.gain:g})")
         if room > 0.01:

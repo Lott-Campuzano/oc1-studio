@@ -89,6 +89,7 @@ class Demo:
     key: str = "a"
     scale: str = "minor"
     steps: int = 16
+    style: str = "clean"        # clean | chip (computadora vieja / 8-bit)
     tracks: list[Track] = field(default_factory=list)
     fx: dict = field(default_factory=dict)
 
@@ -105,12 +106,16 @@ class Demo:
         tracks = [Track.from_obj(t) for t in (d.tracks or [])] or [Track()]
         raw_fx = dict(d.fx or {})
         fx = {k: round(_clamp(v, 0.0, 1.0), 2) for k, v in raw_fx.items() if k in FX_KEYS}
+        style = str(getattr(d, "style", "clean")).lower()
+        if style not in ("clean", "chip"):
+            style = "clean"
         return cls(
             title=str(d.title)[:40] or "untitled",
             bpm=round(_clamp(d.bpm, 20, 300), 1),
             key=str(d.key).lower()[:2] or "a",
             scale=str(d.scale).lower()[:12] or "minor",
             steps=int(_clamp(d.steps, 1, 64)),
+            style=style,
             tracks=tracks,
             fx=fx,
         )
@@ -148,6 +153,31 @@ def default_demo(title: str = "acid_808") -> Demo:
     )
 
 
+def chip_demo(title: str = "chip_boy") -> Demo:
+    """Demo de fábrica 8-bit: pulsos cuadrados, ruido 1-bit y eco Game Boy."""
+    return Demo(
+        title=title,
+        bpm=140.0,
+        key="e",
+        scale="minor",
+        steps=16,
+        style="chip",
+        tracks=[
+            Track(name="kick", sound="kick",
+                  pattern="kick ~ ~ ~ kick ~ kick ~ kick ~ ~ ~ kick ~ ~ ~ ~", gain=1.0),
+            Track(name="noise", sound="hat",
+                  pattern="hat hat hat ~ hat ~ hat hat hat ~ hat hat hat ~ hat hat", gain=0.45),
+            Track(name="snare", sound="snare",
+                  pattern="~ ~ ~ ~ snare ~ ~ ~ ~ ~ ~ ~ snare ~ ~ ~", gain=0.8),
+            Track(name="pulse", sound="square",
+                  pattern="e2 ~ e2 e3 ~ e2 ~ d2 ~ e2 ~ g2 ~ e2 ~ b2 ~", gain=0.6),
+            Track(name="arp", sound="pluck",
+                  pattern="e4 b4 e5 ~ d5 b4 g4 ~ e4 b4 e5 ~ fs5 b5 e6 ~", gain=0.5),
+        ],
+        fx={"reverb": 0.0, "delay": 0.22, "drive": 0.15, "volume": 0.9},
+    )
+
+
 _HEADER = '''"""{title} — demo OP-1 STUDIO
 
 Edita este archivo: ES tu demo. Cada pista es un Track(...).
@@ -179,6 +209,8 @@ def render(demo: Demo) -> str:
     lines.append(f"    key={q(d.key)},")
     lines.append(f"    scale={q(d.scale)},")
     lines.append(f"    steps={int(d.steps)},")
+    if d.style == "chip":
+        lines.append('    style="chip",')
     lines.append("    tracks=[")
     for t in d.tracks:
         lines.append("        Track(")

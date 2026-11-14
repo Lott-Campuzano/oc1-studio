@@ -1,16 +1,17 @@
 # OP-1 STUDIO
 
 Estudio de música **en la terminal** con estética **Teenage Engineering** (OP-1):
-secuenciador de 16 pasos, encoders ASCII, cuatro acentos de color (naranja, azul,
-verde, blanco), demos guardados como **archivos `.py` editables** y **integración git**
+secuenciador de 16 pasos, encoders ASCII, **temas dinámicos** que siguen la
+apariencia de tu sistema (claro/oscuro), demos guardados como **archivos `.py`
+editables**, **puente a Ableton Live vía Max for Live** y **integración git**
 para clonar, guardar cambios y subirlos a GitHub.
 
 ```
-● OP-1 STUDIO   demo: acid_808   ·   126 BPM   ·   a minor   ·   ■
+● OP-1 STUDIO   demo: chip_boy   ·   140 BPM   ·   e minor   ·   ■   ·   white   ·   LIVE 07/16
  ┌ TRACKS ───────┐ ┌ SECUENCIADOR ─────────────────────────┐ ┌ ENCODERS ─┐
  │ ● kick · kick │ │ PISTA │ 1  2  3  4  5  6 …            │ │ REVERB    │
- │ ● acid · saw  │ │ ● kick│ kick ~ ~ ~ kick ~ ~ …         │ │ ╭───╮ 18% │
- │ ● bell · bell │ │ ● acid│ a1 a1 ~ a2 ~ a1 ~ g1 …        │ │ DELAY     │
+ │ ● pulse · sq  │ │ ● kick│ kick ~ ~ ~ kick ~ kick …      │ │ ╭───╮ 18% │
+ │ ● arp · pluck │ │ ● arp │ e4 b4 e5 ~ d5 b4 g4 …         │ │ DELAY     │
  └───────────────┘ └───────────────────────────────────────┘ └───────────┘
 ```
 
@@ -22,19 +23,20 @@ python3 -m venv .venv
 .venv/bin/pip install -e .          # única dependencia: textual
 ```
 
-Requisitos: Python ≥ 3.10, git (opcional, para la integración git),
-y un reproductor del sistema: `afplay` (macOS), `aplay/paplay` (Linux),
-o PowerShell (Windows) — todo automático.
+Requisitos: Python ≥ 3.10, git (opcional), reproductor del sistema
+(`afplay` en macOS, `aplay/paplay` en Linux, PowerShell en Windows) y,
+para el modo LIVE, Ableton Live con Max for Live.
 
 ## Uso
 
 ```bash
-op1studio                       # abre la interfaz TUI (o: python -m op1studio)
-op1studio play demos/demo_acid_808.py      # renderiza y suena (sintetizador local)
+op1studio                       # interfaz TUI (o: python -m op1studio)
+op1studio play demos/demo_chip_boy.py      # renderiza y suena (sintetizador local)
 op1studio code demos/demo_acid_808.py      # imprime el código Strudel
 op1studio strudel demos/demo_acid_808.py   # abre strudel.cc con el demo cargado
 op1studio strudel --page demo.py           # player local con REPL Strudel embebido
-op1studio new "mi-beat"                    # crea demos/mi-beat.py
+op1studio new "mi-beat" [--chip]           # crea demos/mi-beat.py
+op1studio live demos/demo_acid_808.py      # puente LIVE headless (Ableton)
 op1studio list                             # lista los demos
 ```
 
@@ -43,12 +45,13 @@ op1studio list                             # lista los demos
 | Tecla      | Acción                          |
 |------------|---------------------------------|
 | `espacio`  | ▶/■ render + play (local)       |
+| `v`        | LIVE on/off (Ableton vía Max)   |
 | `s`        | guardar demo como `.py`         |
 | `l`        | abrir demo                      |
 | `e`        | abrir en **strudel.cc** (share) |
 | `w`        | player local con Strudel (web)  |
 | `g`        | panel **git**                   |
-| `o`        | ajustes (color, auto-commit…)   |
+| `o`        | ajustes (apariencia, color, puertos…) |
 | `a` / `d`  | añadir / borrar pista           |
 | `t`        | aplicar preset a la pista       |
 | `c`        | cambiar acento de color (TE)    |
@@ -58,22 +61,29 @@ op1studio list                             # lista los demos
 
 Ctrl+P abre la paleta de comandos de Textual.
 
-## Los demos son archivos `.py` editables
+## Temas dinámicos
 
-Cada demo es Python plano — ábrelo con tu editor y cámbialo a mano:
+En Ajustes (`o`) → **APARIENCIA**: `auto (sistema)` · `oscuro` · `claro`.
+En `auto`, la interfaz detecta el modo claro/oscuro de tu sistema
+(macOS `AppleInterfaceStyle`; GNOME via `gsettings`) y cambia solo,
+sondeando cada 5 s. Cada acento (naranja, azul, verde, blanco) tiene su
+variante clara estilo "OP-1 field": fondo blanco hueso y tinta grafito.
+
+## Los demos son archivos `.py` editables
 
 ```python
 from op1studio.demo import Demo, Track
 
 demo = Demo(
-    title="acid_808",
-    bpm=126,
-    key="a", scale="minor",
+    title="chip_boy",
+    bpm=140,
+    key="e", scale="minor",
+    style="chip",                      # 'clean' | 'chip' (computadora vieja)
     tracks=[
-        Track(name="acid", sound="saw",
-              pattern="a1 a1 ~ a2 ~ a1 ~ g1 ~ a1 ~ bb1 ~ a2 ~ e2 ~", gain=0.75),
+        Track(name="pulse", sound="square",
+              pattern="e2 ~ e2 e3 ~ e2 ~ d2 ~ e2 ~ g2 ~ e2 ~ b2 ~", gain=0.6),
     ],
-    fx={"reverb": 0.18, "delay": 0.12, "drive": 0.08, "volume": 0.9},
+    fx={"reverb": 0, "delay": 0.22, "drive": 0.15, "volume": 0.9},
 )
 ```
 
@@ -81,49 +91,78 @@ demo = Demo(
 * Notas: `c3`, `c#3` (sostenido), `bb3` (bemol). Percusión: `kick snare hat clap`.
 * Sonidos: `sine square saw tri pluck bell fm noise kick snare hat clap`.
 
-## Dos motores
+## Dos estilos de sonido
 
-1. **Sintetizador local** (100% stdlib): osciladores + percusión sintetizada +
-   drive/echo/reverb → WAV 44.1 kHz → `afplay`/`aplay`/PowerShell. Sin dependencias.
-2. **Strudel** (live coding en el navegador):
-   * `e` → abre `strudel.cc/#<base64>` (formato share oficial) con el patrón convertido.
-   * `w` → sirvo una página local (estética TE) con el REPL `<strudel-editor>`
-     (`@strudel/repl` vía unpkg) y botones ▶/■/⧉; el audio lo genera Strudel.
+* `style="clean"`: osciladores clásicos, kick analógico, reverb de comb.
+* `style="chip"` (**computadora vieja / 8-bit**): pulsos con duty del 25 %,
+  ruido de 1 bit, kick de onda cuadrada, decimación del reloj a ~7 kHz,
+  cuantización a 24 niveles y eco tipo Game Boy. En Strudel se traduce a
+  ondas cuadradas con `.coarse(8).crush(4)` (verificado en el REPL).
+
+## Puente a Ableton Live (Max for Live)
+
+OP-1 STUDIO actúa como **secuenciador + interfaz**, y Ableton suena los
+instrumentos que pongas en la pista. Comunicación por UDP (localhost):
+
+```
+OP-1 → Max : "op1 note <midi> <vel>"   (percusión mapeada a GM: kick 36, snare 38, hat 42, clap 39)
+Max → OP-1 : "op1 clock <0-15>"        (reloj de 16avos sincronizado con el transporte de Live)
+```
+
+### Montaje (una vez, ~2 min)
+
+1. En Ableton: pista MIDI → añade un **Max MIDI Effect** vacío.
+2. Abre su patcher; en Max: File → Open → `max/op1-studio-bridge.maxpat`;
+   selecciona todo (⌘A), copia (⌘C), pégalo en el patcher del dispositivo y
+   guarda el dispositivo (⌘S). (También puedes cargar el `.maxpat` como
+   patcher del dispositivo directamente.)
+3. En OP-1 STUDIO pulsa `v` (LIVE) — o ejecuta `op1studio live <demo.py>`
+   para usarlo sin interfaz.
+4. Dale **play** en Ableton: el reloj de 16avos llega por UDP y OP-1 envía
+   las notas de cada paso → suenan por el `midiout` del dispositivo, con
+   el instrumento que tengas cargado en esa pista (sintetizador, drum rack…).
+
+Qué hace el dispositivo Max: `udpreceive 7647 → route op1 → route note →
+makenote 150 → pack → midiformat → midiout`, y el reloj:
+`transport → round 120 → change → expr (int($f1/120.) % 16) → prepend
+op1 clock → udpsend 127.0.0.1 7648`. Los puertos se cambian en Ajustes (`o`).
 
 ## Git / GitHub
 
 ```bash
 op1studio git init                                   # convierte la carpeta en repo
 op1studio git add-remote origin https://github.com/tu-usuario/op1-demos.git
-op1studio git commit -m "demo: acid_808"             # add -A + commit
+op1studio git commit -m "demo: chip_boy"             # add -A + commit
 op1studio git push                                   # almacena en GitHub
 op1studio git pull                                   # baja cambios
 op1studio git clone https://github.com/alguien/demos.git
 ```
 
-En la TUI (tecla `g`) hay botones para **STATUS / COMMIT / PUSH / PULL /
-REMOTE / CLONE / INIT / LOG**, y en Ajustes (`o`) puedes activar
-**auto-commit al guardar** para versionar cada cambio de tus demos.
-Autenticación con GitHub: HTTPS + token o SSH — la resuelve tu git de siempre.
+En la TUI (tecla `g`): **STATUS / COMMIT / PUSH / PULL / REMOTE / CLONE /
+INIT / LOG**, y en Ajustes el **auto-commit al guardar** versiona cada
+cambio de tus demos. Autenticación GitHub: HTTPS + token o SSH.
 
 ## ¿OpenTUI?
 
-[OpenTUI](https://opentui.com) es TypeScript/Zig y no corre dentro de un programa
-Python, así que la interfaz usa **Textual** (el equivalente en Python) recreando
-la estética: encoders ASCII giratorios, barra de encabezado con puntos de color,
-botones de tecla OP-1 y 4 temas de acento intercambiables (`c`).
+[OpenTUI](https://opentui.com) es TypeScript/Zig y no corre dentro de un
+programa Python, así que la interfaz usa **Textual** recreando la estética:
+encoders ASCII giratorios, botones de tecla OP-1, temas claro/oscuro por
+acento y sondeo del tema del sistema.
 
 ## Estructura
 
 ```
 op1studio/
-├── app.py      interfaz TUI (Textual, estética TE)
-├── cli.py      línea de comandos
-├── demo.py     modelo Demo/Track + guardar/cargar .py
-├── synth.py    motor local (stdlib): render → WAV → player
-├── strudel.py  codegen Strudel + share URL + player local
-├── gitops.py   git: init/clone/commit/push/pull/remotes
-├── settings.py ~/.op1studio/config.json
-└── theme.py    paleta Teenage Engineering + temas Textual
-demos/          tus demos (.py)
+├── app.py           interfaz TUI (Textual, estética TE, temas dinámicos)
+├── cli.py           línea de comandos (play/code/strudel/new/live/git)
+├── demo.py          modelo Demo/Track (style clean|chip) + .py save/load
+├── synth.py         motor local: osciladores + chip 8-bit → WAV → player
+├── strudel.py       codegen Strudel (con coarse/crush) + share + player local
+├── live_bridge.py   puente UDP ↔ Max for Live (notas + reloj)
+├── system_theme.py  detección claro/oscuro del sistema
+├── gitops.py        git: init/clone/commit/push/pull/remotes
+├── settings.py      ~/.op1studio/config.json
+└── theme.py         paleta Teenage Engineering (temas oscuros y claros)
+max/op1-studio-bridge.maxpat   dispositivo Max for Live listo para pegar
+demos/                         tus demos (.py)
 ```

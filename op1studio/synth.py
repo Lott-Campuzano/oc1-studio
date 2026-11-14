@@ -42,6 +42,18 @@ def note_to_freq(token: str) -> float | None:
     return 440.0 * 2.0 ** ((midi - 69) / 12.0)
 
 
+def note_to_midi(token: str) -> int | None:
+    """'c#3' → número MIDI (60 = c4); None si no es nota. Para el puente LIVE."""
+    m = _NOTE_RE.match(token.strip())
+    if not m:
+        return None
+    name = m.group(1).lower()
+    acc = m.group(2) or ""
+    octv = int(m.group(3))
+    semi = _NOTES[name] + (1 if acc == "#" else -1 if acc == "b" else 0)
+    return 12 * (octv + 1) + semi
+
+
 # ---------------------------------------------------------------- voces
 
 def _env_decay(n: int, decay: float, attack: float = 0.004) -> list[float]:
@@ -52,25 +64,27 @@ def _env_decay(n: int, decay: float, attack: float = 0.004) -> list[float]:
     return out
 
 
-def _mel(shape: str, freq: float, dur: float, gain: float) -> list[float]:
+def _mel(shape: str, freq: float, dur: float, gain: float, chip: bool = False) -> list[float]:
     n = int(dur * SR)
     env = _env_decay(n, _DECAY.get(shape, 0.3))
     out = []
     for i in range(n):
         t = i / SR
         p = TAU * freq * t
+        frac = (freq * t) % 1.0
         if shape == "sine":
             v = math.sin(p)
         elif shape == "square":
-            v = 1.0 if math.sin(p) > 0 else -1.0
+            v = (1.0 if frac < 0.25 else -1.0) if chip else (1.0 if math.sin(p) > 0 else -1.0)
         elif shape == "saw":
-            v = 2.0 * ((freq * t) % 1.0) - 1.0
+            v = 2.0 * frac - 1.0
         elif shape == "tri":
-            v = 4.0 * abs(((freq * t) % 1.0) - 0.5) - 1.0
+            v = 4.0 * abs(frac - 0.5) - 1.0
         elif shape == "noise":
-            v = random.uniform(-1.0, 1.0)
+            v = (1.0 if random.random() < 0.5 else -1.0) if chip else random.uniform(-1.0, 1.0)
         elif shape == "pluck":
-            v = math.sin(p) + 0.4 * math.sin(2.0 * p)
+            v = (math.sin(p) + 0.4 * math.sin(2.0 * p)) if not chip else (
+                (1.0 if frac < 0.5 else -1.0) + 0.5 * (1.0 if frac < 0.25 else -1.0))
         elif shape == "bell":
             v = (math.sin(p) + 0.5 * math.sin(TAU * freq * 2.756 * t)
                  + 0.25 * math.sin(TAU * freq * 5.404 * t))
@@ -80,34 +94,48 @@ def _mel(shape: str, freq: float, dur: float, gain: float) -> list[float]:
     return out
 
 
-def _kick(dur: float, gain: float) -> list[float]:
+def _kick(dur: float, gain: float, chip: bool = False) -> list[float]:
     n = int(dur * SR)
     out = []
     for i in range(n):
         t = i / SR
         f = 45.0 + 115.0 * math.exp(-t / 0.02)
-        v = math.sin(TAU * f * t) * math.exp(-t / 0.25)
-        click = 0.4 * random.uniform(-1, 1) * math.exp(-t / 0.006)
-        out.append((v + click) * gain)
+        if chip:  # pulso cuadrado cayendo, estilo consola de 8 bits
+            frac = (f * t) % 1.0
+            v = 1.0 if frac < 0.25 else -1.0
+            out.append(v * math.exp(-t / 0.18) * gain * 0.9)
+        else:
+            v = math.sin(TAU * f * t) * math.exp(-t / 0.25)
+            click = 0.4 * random.uniform(-1, 1) * math.exp(-t / 0.006)
+            out.append((v + click) * gain)
     return out
 
 
-def _snare(dur: float, gain: float) -> list[float]:
+def _snare(dur: float, gain: float, chip: bool = False) -> list[float]:
     n = int(dur * SR)
     out = []
     for i in range(n):
         t = i / SR
-        v = 0.7 * random.uniform(-1, 1) + 0.5 * math.sin(TAU * 185.0 * t)
-        out.append(v * math.exp(-t / 0.12) * gain)
+        if chip:  # ruido de 1 bit + tono cuadrado
+            nz = 1.0 if random.random() < 0.5 else -1.0
+            tone = 1.0 if ((185.0 * t) % 1.0) < 0.5 else -1.0
+            out.append((0.7 * nz + 0.4 * tone) * math.exp(-t / 0.1) * gain)
+        else:
+            v = 0.7 * random.uniform(-1, 1) + 0.5 * math.sin(TAU * 185.0 * t)
+            out.append(v * math.exp(-t / 0.12) * gain)
     return out
 
 
-def _hat(dur: float, gain: float) -> list[float]:
+def _hat(dur: float, gain: float, chip: bool = False) -> list[float]:
     n = int(dur * SR)
     out = []
     prev = 0.0
     for i in range(n):
         t = i / SR
+        if chip:  # 1 bit, muy corto
+            nz = 1.0 if random.random() < 0.5 else -1.0
+            out.append(nz * math.exp(-t / 0.025) * gain * 0.7)
+            continue
         nz = random.uniform(-1.0, 1.0)
         v = (nz - prev) * 0.8  # realce de agudos por diferencia
         prev = nz
@@ -115,11 +143,16 @@ def _hat(dur: float, gain: float) -> list[float]:
     return out
 
 
-def _clap(dur: float, gain: float) -> list[float]:
+def _clap(dur: float, gain: float, chip: bool = False) -> list[float]:
     n = int(dur * SR)
     out = []
     for i in range(n):
         t = i / SR
+        if chip:  # dos ráfagas de ruido de 1 bit
+            nz = 1.0 if random.random() < 0.5 else -1.0
+            a = math.exp(-t / 0.01) + 0.7 * math.exp(-((t - 0.02) ** 2) / 1e-5)
+            out.append(nz * a * gain * 0.7)
+            continue
         a = (math.exp(-t / 0.012)
              + 0.8 * math.exp(-((t - 0.014) ** 2) / 2e-5)
              + 0.6 * math.exp(-((t - 0.028) ** 2) / 2e-5)
@@ -128,20 +161,20 @@ def _clap(dur: float, gain: float) -> list[float]:
     return out
 
 
-def _segment(tr: Track, tok: str, dur: float) -> list[float]:
+def _segment(tr: Track, tok: str, dur: float, chip: bool = False) -> list[float]:
     s = tr.sound
     if s == "kick":
-        return _kick(dur, tr.gain)
+        return _kick(dur, tr.gain, chip)
     if s == "snare":
-        return _snare(dur, tr.gain)
+        return _snare(dur, tr.gain, chip)
     if s == "hat":
-        return _hat(dur, tr.gain)
+        return _hat(dur, tr.gain, chip)
     if s == "clap":
-        return _clap(dur, tr.gain)
+        return _clap(dur, tr.gain, chip)
     freq = note_to_freq(tok)
     if freq is None:
         return []  # token desconocido ⇒ silencio
-    return _mel(s, freq, dur, tr.gain)
+    return _mel(s, freq, dur, tr.gain, chip)
 
 
 # ---------------------------------------------------------------- FX
@@ -179,11 +212,33 @@ def _reverb(buf: list[float], amount: float) -> None:
             buf[i] += buf[i - D] * g * amount
 
 
+def _decimate(buf: list[float], hold: int) -> None:
+    """Sample-and-hold: baja la tasa efectiva ( crunch de reloj viejo )."""
+    if hold <= 1:
+        return
+    last = 0.0
+    for i, x in enumerate(buf):
+        if i % hold == 0:
+            last = x
+        else:
+            buf[i] = last
+
+
+def _quantize(buf: list[float], levels: int) -> None:
+    """Cuantización de amplitud ( profundidad de bits baja )."""
+    if levels <= 1:
+        return
+    q = levels - 1
+    for i, x in enumerate(buf):
+        buf[i] = round(x * q) / q
+
+
 # ---------------------------------------------------------------- render
 
 def render(demo: Demo) -> list[float]:
     """Mezcla el demo completo (mono) y devuelve las muestras normalizadas."""
     d = demo.normalized()
+    chip = d.style == "chip"
     step = 60.0 / d.bpm / 4.0
     total = int(step * d.steps * SR) + SR  # +1 s de cola
     buf = [0.0] * total
@@ -191,13 +246,16 @@ def render(demo: Demo) -> list[float]:
         for idx, tok in enumerate(tr.tokens(d.steps)):
             if tok in ("~", "."):
                 continue
-            seg = _segment(tr, tok, step)
+            seg = _segment(tr, tok, step, chip)
             if seg:
                 _add(buf, seg, int(idx * step * SR))
     fx = d.fx
     _drive(buf, fx.get("drive", 0.0))
     _echo(buf, fx.get("delay", 0.0), step)
     _reverb(buf, fx.get("reverb", 0.0))
+    if chip:  # post-proceso "computadora vieja": reloj ~7 kHz y 24 niveles
+        _decimate(buf, 6)
+        _quantize(buf, 24)
     vol = fx.get("volume", 1.0)
     if vol != 1.0:
         for i, x in enumerate(buf):

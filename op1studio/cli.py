@@ -18,6 +18,7 @@ from pathlib import Path
 
 from . import demo as demoio
 from . import gitops, settings
+from . import live_bridge
 from . import strudel as strudelio
 from . import synth
 
@@ -63,10 +64,18 @@ def cmd_strudel(args) -> None:
 
 
 def cmd_new(args) -> None:
-    d = demoio.default_demo(args.name)
+    d = demoio.chip_demo(args.name) if args.chip else demoio.default_demo(args.name)
     path = Path(settings.get("demo_dir", "demos")) / f"{demoio.slugify(args.name)}.py"
     demoio.save(d, path)
     print(f"● demo creado → {path}")
+
+
+def cmd_live(args) -> None:
+    d = _load_or_exit(args.demo)
+    cfg = settings.load()
+    live_bridge.run_headless(d,
+                             send_port=int(cfg.get("live_send_port", 7647)),
+                             recv_port=int(cfg.get("live_recv_port", 7648)))
 
 
 def cmd_list(args) -> None:
@@ -129,6 +138,9 @@ def build_parser() -> argparse.ArgumentParser:
     c.add_argument("--port", type=int, default=0)
     c = sub.add_parser("new", help="crea un demo nuevo")
     c.add_argument("name")
+    c.add_argument("--chip", action="store_true", help="estilo 8-bit (computadora vieja)")
+    c = sub.add_parser("live", help="puente LIVE headless para Ableton (Max for Live)")
+    c.add_argument("demo")
     sub.add_parser("list", help="lista los demos")
 
     g = sub.add_parser("git", help="clone / status / commit / push / pull / add-remote")
@@ -156,4 +168,5 @@ def main(argv: list[str] | None = None) -> int:
         OP1App().run()
         return 0
     return {"play": cmd_play, "code": cmd_code, "strudel": cmd_strudel,
-            "new": cmd_new, "list": cmd_list, "git": cmd_git}[args.cmd](args) or 0
+            "new": cmd_new, "list": cmd_list, "git": cmd_git,
+            "live": cmd_live}[args.cmd](args) or 0
