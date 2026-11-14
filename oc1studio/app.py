@@ -1,4 +1,4 @@
-"""OP-1 STUDIO — interfaz TUI (Textual) con estética Teenage Engineering.
+"""OC-1 STUDIO — interfaz TUI (Textual) con estética Teenage Engineering.
 
 Layout: TRACKS | secuenciador + cinta | ENCODERS + preview Strudel.
 Teclas: espacio ▶/■ · s guardar · l abrir · e strudel · w player · g git
@@ -61,7 +61,7 @@ ENCODERS = [  # (clave fx, etiqueta, color TE)
 # ----------------------------------------------------------------- widgets
 
 class TopBar(Static):
-    """Barra superior estilo OP-1: punto de color + estado."""
+    """Barra superior estilo OC-1: punto de color + estado."""
 
     def update_state(self, app: "OP1App") -> None:
         accent = theme.ACCENTS.get(theme.accent_of(app.theme), "#ff5300")
@@ -69,7 +69,7 @@ class TopBar(Static):
         state = "▶" if app._playing else "■"
         txt = Text()
         txt.append("● ", style=Style(color=accent, bold=True))
-        txt.append("OP-1 STUDIO", style=Style(bold=True))
+        txt.append("OC-1 STUDIO", style=Style(bold=True))
         txt.append(f"   demo: {t.title}", style=Style(color="#9a9a9a"))
         txt.append(f"   ·   {t.bpm:g} BPM", style=Style(color="#e8e6e3"))
         txt.append(f"   ·   {t.key} {t.scale}", style=Style(color="#9a9a9a"))
@@ -88,7 +88,7 @@ class TopBar(Static):
 
 
 class Encoder(Static, can_focus=True):
-    """Encoder giratorio ASCII (estética OP-1): ↑/↓ giran, 0 pone a cero."""
+    """Encoder giratorio ASCII (estética OC-1): ↑/↓ giran, 0 pone a cero."""
 
     BINDINGS = [
         Binding("up", "enc_up", "+", show=False),
@@ -205,7 +205,7 @@ class OpenScreen(ModalScreen):
         for p in self._files:
             lv.append(ListItem(Label(f"● {p.name}")))
         if not self._files:
-            lv.append(ListItem(Label("(carpeta vacía — crea: op1studio new X)")))
+            lv.append(ListItem(Label("(carpeta vacía — crea: oc1studio new X)")))
 
     def on_list_view_selected(self, event: ListView.Selected) -> None:
         i = event.list_view.index
@@ -301,7 +301,7 @@ class SettingsScreen(ModalScreen):
                 for label, val in (("auto (sistema)", "auto"), ("oscuro", "dark"), ("claro", "light")):
                     yield RadioButton(label, value=(cfg.get("appearance", "auto") == val),
                                       id=f"md-{val}")
-            yield Static("COLOR (estilo OP-1):", classes="hint")
+            yield Static("COLOR (estilo OC-1):", classes="hint")
             with RadioSet(id="theme-set"):
                 for key in theme.ACCENTS:
                     yield RadioButton(key, value=(cfg.get("accent", "orange") == key),
@@ -317,6 +317,7 @@ class SettingsScreen(ModalScreen):
                 yield Input(value=str(cfg.get("live_recv_port", 7648)),
                             id="opt-recv", classes="tin")
             yield Button("CERRAR esc", id="set-close", classes="btn b-white")
+            yield Static("hecho con GLM-5.3-Flash-Free + OpenCode", classes="hint credit")
 
     def on_radio_set_changed(self, event: RadioSet.Changed) -> None:
         rid = event.pressed.id or ""
@@ -500,7 +501,7 @@ class StudioScreen(Screen):
 # ----------------------------------------------------------------- App
 
 class OP1App(App):
-    TITLE = "OP-1 STUDIO"
+    TITLE = "OC-1 STUDIO"
     CSS_PATH = None
 
     CSS = """
@@ -529,6 +530,7 @@ class OP1App(App):
               background: $surface; border: round $primary; padding: 1 2; }
     .modal-title { text-style: bold; height: 1; margin-bottom: 1; }
     .hint { color: $text-muted; height: 1; }
+    .credit { content-align: center middle; color: $text-disabled; }
     #git-out { height: 12; border: round $panel; margin: 1 0; }
     #open-list { height: 12; border: round $panel; margin-bottom: 1; }
     Input { height: 3; }

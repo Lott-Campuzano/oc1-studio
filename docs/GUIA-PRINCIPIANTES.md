@@ -2,17 +2,17 @@
 
 > Nunca has tocado una terminal y vienes de Ableton, FL Studio, Logic o
 > GarageBand. Bienvenido: esta guía te lleva de la mano desde cero.
-> Si sabes usar un DAW, ya sabes usar OP-1 STUDIO — solo cambia la pantalla.
+> Si sabes usar un DAW, ya sabes usar OC-1 STUDIO — solo cambia la pantalla.
 
 ---
 
 ## 1. ¿Qué es esto?
 
-OP-1 STUDIO es un **mini-DAW que vive dentro de la Terminal** (esa ventana
+OC-1 STUDIO es un **mini-DAW que vive dentro de la Terminal** (esa ventana
 negra con letras que los hackers usan en las películas). Hace lo esencial
 de un DAW:
 
-| En tu DAW | En OP-1 STUDIO |
+| En tu DAW | En OC-1 STUDIO |
 |---|---|
 | Pistas / canales | **TRACKS** (panel de la izquierda) |
 | Piano roll / step sequencer | **El patrón**: 16 casillas, una nota por casilla |
@@ -50,10 +50,10 @@ vas a escribir (o pegar) unos comandos.
 Abre la Terminal y pega estas 3 líneas, una por una:
 
 ```bash
-cd "ruta/a/la/carpeta/op1-studio"
+cd "ruta/a/la/carpeta/oc1-studio"
 ```
 *(Truco en macOS: escribe `cd ` con un espacio y luego **arrastra la carpeta
-op1-studio a la ventana de Terminal** — la ruta se escribe sola, da `Enter`.)*
+oc1-studio a la ventana de Terminal** — la ruta se escribe sola, da `Enter`.)*
 
 ```bash
 python3 -m venv .venv
@@ -63,7 +63,7 @@ python3 -m venv .venv
 ```bash
 .venv/bin/pip install -e .
 ```
-*(Esto instala OP-1 STUDIO con su única dependencia. Descarga ~10 MB.)*
+*(Esto instala OC-1 STUDIO con su única dependencia. Descarga ~10 MB.)*
 
 En **Windows** la última línea es distinta:
 ```powershell
@@ -78,9 +78,9 @@ En **Windows** la última línea es distinta:
 ## 4. Arrancar y escuchar tu primer beat
 
 ```bash
-.venv/bin/op1studio
+.venv/bin/oc1studio
 ```
-*(En Windows: `.venv\Scripts\op1studio`)*
+*(En Windows: `.venv\Scripts\oc1studio`)*
 
 Se abre la interfaz: pista a pista, un secuenciador de 16 pasos, cuatro
 encoders y una cinta con la forma de onda. Ahora:
@@ -124,26 +124,26 @@ Strudel es como un DAW de live-coding que corre en strudel.cc, sin instalar nada
 
 * Tecla **`e`** → tu demo se abre en strudel.cc ya cargado. Dale PLAY ahí y
   edita el código en vivo (es la web oficial, `https://strudel.cc`).
-* Tecla **`w`** → un "player" local con la misma estética OP-1 y el editor
+* Tecla **`w`** → un "player" local con la misma estética TE y el editor
   embebido, con botones ▶ / ■ / ⧉ copiar.
 
 ---
 
 ## 7. Usarlo como plugin de Ableton (con Max for Live)
 
-Piénsalo así: OP-1 STUDIO es el **secuenciador** (la "cabeza") y Ableton es
+Piénsalo así: OC-1 STUDIO es el **secuenciador** (la "cabeza") y Ableton es
 el **sonido** (los instrumentos que ya tienes). Se conectan por dentro de
 tu propia máquina — no hay nube ni servidores.
 
 1. En Ableton: crea una pista MIDI → añade un **Max MIDI Effect** vacío.
-2. En Max: File → Open → elige `max/op1-studio-bridge.maxpat`, selecciona
+2. En Max: File → Open → elige `max/oc1-studio-bridge.maxpat`, selecciona
    todo (⌘A), copia, pega en el patcher del dispositivo y guarda (⌘S).
-3. En OP-1 STUDIO pulsa **`v`** → aparece `LIVE` en verde.
-4. Dale **play** en Ableton. El secuenciador de OP-1 se sincroniza y las
+3. En OC-1 STUDIO pulsa **`v`** → aparece `LIVE` en verde.
+4. Dale **play** en Ableton. El secuenciador de OC-1 se sincroniza y las
    notas entran por el dispositivo Max: suenan con el instrumento que
    pongas en esa pista (Operator, un drum rack, Serum, lo que quieras).
 
-Sin Ableton: `op1studio live demos/demo_acid_808.py` hace lo mismo en segundo plano.
+Sin Ableton: `oc1studio live demos/demo_acid_808.py` hace lo mismo en segundo plano.
 
 ---
 
@@ -153,13 +153,13 @@ GitHub es como Google Drive para código: guarda cada versión, para siempre,
 gratis y público si quieres.
 
 ```bash
-op1studio git add-remote origin https://github.com/TU-USUARIO/op1-studio.git
-op1studio git push
+oc1studio git add-remote origin https://github.com/TU-USUARIO/oc1-studio.git
+oc1studio git push
 ```
 
 *(La primera vez GitHub pedirá entrar: sigue el navegador.)*
 
-Cada vez que guardes un demo y quieras subirlo: `op1studio git commit -m "cambié el bajo"` → `op1studio git push`.
+Cada vez que guardes un demo y quieras subirlo: `oc1studio git commit -m "cambié el bajo"` → `oc1studio git push`.
 En la interfaz es la tecla `g` (panel GIT) — botones COMMIT / PUSH / PULL.
 
 ---
@@ -168,7 +168,7 @@ En la interfaz es la tecla `g` (panel GIT) — botones COMMIT / PUSH / PULL.
 
 | Síntoma | Solución |
 |---|---|
-| `command not found` | No hiciste `cd` a la carpeta, o falta `./` — usa `.venv/bin/op1studio` |
+| `command not found` | No hiciste `cd` a la carpeta, o falta `./` — usa `.venv/bin/oc1studio` |
 | No suena nada | El volumen master (encoder VOL) o el volumen del sistema; en Windows revisa que el altavoz predeterminado exista |
 | La pantalla se ve partida | Agranda la ventana de la Terminal (mínimo ~100 columnas) |
 | `textual` no se instala | Revisa que Python 3.10+ esté: `python3 --version` |
@@ -185,7 +185,12 @@ En la interfaz es la tecla `g` (panel GIT) — botones COMMIT / PUSH / PULL.
 * **pip**: el "App Store" de Python (instala librerías).
 * **Repositorio / repo**: tu carpeta de proyecto con historial de versiones (git).
 * **Push / Pull**: subir tus cambios a GitHub / bajarlos.
-* **UDP/puerto**: el "cable" interno por el que OP-1 habla con Ableton.
+* **UDP/puerto**: el "cable" interno por el que OC-1 habla con Ableton.
 
 ¿Dudas? Abre un *issue* en el repositorio de GitHub — los proyectos como
 este viven de la gente que pregunta. 🎛️
+
+---
+
+*OC-1 STUDIO es hecho con **GLM-5.3-Flash-Free** y **OpenCode**: código,
+documentación y publicación por IA; la música la pones tú.*

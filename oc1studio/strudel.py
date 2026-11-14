@@ -26,7 +26,7 @@ DRUM_MAP = {"kick": "bd", "snare": "sn", "hat": "hh", "clap": "cp",
 
 
 def _mini(pattern: str, drum: bool = False) -> str:
-    """patrón OP-1 → mini-notación de strudel ('.'/'~' → '~'; drums → bd/sn/hh/cp)."""
+    """patrón OC-1 → mini-notación de strudel ('.'/'~' → '~'; drums → bd/sn/hh/cp)."""
     toks = []
     for tok in pattern.split():
         if tok in (".", "~"):
@@ -81,7 +81,7 @@ def share_url(demo: Demo) -> str:
 _PLAYER_HTML = """<!doctype html>
 <html lang="es"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>OP-1 STUDIO → Strudel</title>
+<title>OC-1 STUDIO → Strudel</title>
 <style>
   :root{--orange:#ff5300;--blue:#00a8ff;--green:#00d26a;--white:#f0f0f0;--bg:#121212;--ink:#e8e6e3}
   *{box-sizing:border-box}
@@ -104,7 +104,7 @@ _PLAYER_HTML = """<!doctype html>
 <body>
 <header>
   <span class="dot" style="background:var(--orange)"></span>
-  <h1>OP-1 STUDIO → STRUDEL</h1>
+  <h1>OC-1 STUDIO → STRUDEL</h1>
   <span class="meta">__META__</span>
   <span class="spacer"></span>
   <button class="btn b-blue" id="play">▶ PLAY</button>
@@ -130,7 +130,7 @@ _PLAYER_HTML = """<!doctype html>
     b.textContent = msg; setTimeout(() => b.textContent = o, 1200);
   }
 </script>
-<footer>OP-1 STUDIO · servidor local · el audio lo reproduce strudel en tu navegador</footer>
+<footer>OC-1 STUDIO · hecho con GLM-5.3-Flash-Free + OpenCode · servidor local · el audio lo reproduce strudel en tu navegador</footer>
 </body></html>
 """
 
@@ -154,7 +154,7 @@ class StrudelServer:
         self.port = self.httpd.server_address[1]
         self.url = f"http://127.0.0.1:{self.port}/"
         self.thread = threading.Thread(target=self.httpd.serve_forever,
-                                       daemon=True, name="op1-strudel")
+                                       daemon=True, name="oc1-strudel")
         self.thread.start()
 
     def _make_handler(self):

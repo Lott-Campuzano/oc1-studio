@@ -19,7 +19,7 @@
 					"numinlets" : 1,
 					"numoutlets" : 0,
 					"patching_rect" : [ 32.0, 24.0, 560.0, 22.0 ],
-					"text" : "OP-1 STUDIO ↔ Ableton · notas UDP:7647 → MIDI out · reloj 16avos → UDP:7648"
+					"text" : "OC-1 STUDIO ↔ Ableton · notas UDP:7647 → MIDI out · reloj 16avos → UDP:7648"
 				}
 
 			}
@@ -43,7 +43,7 @@
 					"numoutlets" : 2,
 					"outlettype" : [ "", "" ],
 					"patching_rect" : [ 32.0, 116.0, 100.0, 24.0 ],
-					"text" : "route op1"
+					"text" : "route oc1"
 				}
 
 			}
@@ -162,7 +162,7 @@
 					"numoutlets" : 1,
 					"outlettype" : [ "" ],
 					"patching_rect" : [ 360.0, 224.0, 140.0, 24.0 ],
-					"text" : "prepend op1 clock"
+					"text" : "prepend oc1 clock"
 				}
 
 			}

@@ -1,12 +1,12 @@
-"""Puente OP-1 STUDIO ↔ Ableton Live vía Max for Live (UDP, texto plano).
+"""Puente OC-1 STUDIO ↔ Ableton Live vía Max for Live (UDP, texto plano).
 
 Protocolo (127.0.0.1):
-  Python → Max : "op1 note <midi> <vel>"     (melódicas + percusión en GM)
-                 "op1 bpm <x>"               (estado informativo)
-  Max → Python : "op1 clock <paso 0-15>"     (reloj de 16avos desde transport)
-                 "op1 transport play|stop"   (opcional)
+  Python → Max : "oc1 note <midi> <vel>"     (melódicas + percusión en GM)
+                 "oc1 bpm <x>"               (estado informativo)
+  Max → Python : "oc1 clock <paso 0-15>"     (reloj de 16avos desde transport)
+                 "oc1 transport play|stop"   (opcional)
 
-El dispositivo Max (max/op1-studio-bridge.maxpat) convierte las notas a MIDI
+El dispositivo Max (max/oc1-studio-bridge.maxpat) convierte las notas a MIDI
 (midiout) y emite el reloj de 16avos sincronizado con el transporte de Live.
 """
 from __future__ import annotations
@@ -22,7 +22,7 @@ GM_DRUM = {"kick": 36, "snare": 38, "hat": 42, "clap": 39,
 
 
 class LiveBridge:
-    """Servidor/cliente UDP que sincroniza OP-1 STUDIO con Ableton vía Max."""
+    """Servidor/cliente UDP que sincroniza OC-1 STUDIO con Ableton vía Max."""
 
     def __init__(self, demo, send_port: int = 7647, recv_port: int = 7648,
                  on_clock=None) -> None:
@@ -46,7 +46,7 @@ class LiveBridge:
             return
         self._running = True
         self._rx.bind(("127.0.0.1", self.recv_port))
-        threading.Thread(target=self._loop, daemon=True, name="op1-live").start()
+        threading.Thread(target=self._loop, daemon=True, name="oc1-live").start()
         self.send_bpm()
 
     def stop(self) -> None:
@@ -70,7 +70,7 @@ class LiveBridge:
             except OSError:
                 break
             parts = data.decode("utf-8", "ignore").strip().split()
-            if len(parts) < 3 or parts[0] != "op1":
+            if len(parts) < 3 or parts[0] != "oc1":
                 continue
             kind = parts[1]
             if kind == "clock":
@@ -102,7 +102,7 @@ class LiveBridge:
             pass
 
     def send_bpm(self) -> None:
-        self._send(f"op1 bpm {float(self.demo.bpm):g}")
+        self._send(f"oc1 bpm {float(self.demo.bpm):g}")
 
     def step_notes(self, step: int) -> list[tuple[int, int]]:
         """Notas MIDI (nota, velocidad) que suenan en `step` según el demo."""
@@ -126,11 +126,11 @@ class LiveBridge:
 
     def send_step(self, step: int) -> None:
         for midi, vel in self.step_notes(step):
-            self._send(f"op1 note {midi} {vel}")
+            self._send(f"oc1 note {midi} {vel}")
 
 
 def run_headless(demo, send_port: int = 7647, recv_port: int = 7648) -> None:
-    """Puente LIVE sin interfaz: op1studio live <demo.py>."""
+    """Puente LIVE sin interfaz: oc1studio live <demo.py>."""
     bridge = LiveBridge(demo, send_port=send_port, recv_port=recv_port)
     last: list[int] = [-1]
 

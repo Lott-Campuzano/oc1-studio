@@ -23,7 +23,7 @@ _NOTES = {"c": 0, "c#": 1, "db": 1, "d": 2, "d#": 3, "eb": 3, "e": 4, "f": 5,
           "f#": 6, "gb": 6, "g": 7, "g#": 8, "ab": 8, "a": 9, "a#": 10, "bb": 10, "b": 11}
 _NOTE_RE = re.compile(r"^([a-g])(#|b)?(-?\d+)$", re.I)
 
-CACHE_DIR = Path.home() / ".op1studio" / "cache"
+CACHE_DIR = Path.home() / ".oc1studio" / "cache"
 
 _DECAY = {"sine": 0.30, "square": 0.25, "saw": 0.28, "tri": 0.30,
           "pluck": 0.35, "bell": 0.90, "fm": 0.40, "noise": 0.15}
@@ -284,7 +284,7 @@ def write_wav(samples: list[float], path: Path) -> Path:
 
 
 def render_to_cache(demo: Demo) -> tuple[Path, list[float]]:
-    """Renderiza y guarda el WAV en ~/.op1studio/cache; devuelve (ruta, muestras)."""
+    """Renderiza y guarda el WAV en ~/.oc1studio/cache; devuelve (ruta, muestras)."""
     from .demo import slugify
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     samples = render(demo)
@@ -297,7 +297,7 @@ BLOCKS = " ▁▂▃▄▅▆▇█"
 
 
 def wave_preview(samples: list[float], width: int = 48) -> str:
-    """Onda en ASCII (estilo cinta de OP-1)."""
+    """Onda en ASCII (estilo cinta de OC-1)."""
     if not samples:
         return ""
     size = len(samples)

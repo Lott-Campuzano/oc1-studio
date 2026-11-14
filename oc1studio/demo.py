@@ -2,7 +2,7 @@
 
 Un demo es Python plano, editable a mano:
 
-    from op1studio.demo import Demo, Track
+    from oc1studio.demo import Demo, Track
 
     demo = Demo(
         title="acid_808",
@@ -178,16 +178,16 @@ def chip_demo(title: str = "chip_boy") -> Demo:
     )
 
 
-_HEADER = '''"""{title} — demo OP-1 STUDIO
+_HEADER = '''"""{title} — demo OC-1 STUDIO
 
 Edita este archivo: ES tu demo. Cada pista es un Track(...).
 pattern: un token por semicorchea; '~' o '.' = silencio.
 Notas: c3, c#3, bb3 — percusión: kick, snare, hat, clap.
 Sonidos: {sounds}
-Reproduce: python -m op1studio play <archivo>
-Strudel:   python -m op1studio strudel <archivo>
+Reproduce: python -m oc1studio play <archivo>
+Strudel:   python -m oc1studio strudel <archivo>
 """
-from op1studio.demo import Demo, Track
+from oc1studio.demo import Demo, Track
 
 '''
 
@@ -226,7 +226,7 @@ def render(demo: Demo) -> str:
 
 
 _IMPORT_RE = re.compile(
-    r"^\s*(?:from\s+op1studio[\w.]*\s+import\s+[\w, ]+|import\s+op1studio[\w.]*).*$",
+    r"^\s*(?:from\s+oc1studio[\w.]*\s+import\s+[\w, ]+|import\s+oc1studio[\w.]*).*$",
     re.M,
 )
 

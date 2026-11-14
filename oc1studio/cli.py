@@ -1,12 +1,12 @@
-"""CLI de OP-1 STUDIO.
+"""CLI de OC-1 STUDIO.
 
-    op1studio              → interfaz TUI (estilo OP-1)
-    op1studio play X.py    → renderiza y reproduce el demo
-    op1studio code X.py    → imprime el código Strudel
-    op1studio strudel X.py → abre strudel.cc con el demo (--page: player local)
-    op1studio new NAME     → crea demos/NAME.py
-    op1studio list         → lista los demos
-    op1studio git clone|status|commit|push|pull|add-remote|remotes
+    oc1studio              → interfaz TUI (estilo OC-1)
+    oc1studio play X.py    → renderiza y reproduce el demo
+    oc1studio code X.py    → imprime el código Strudel
+    oc1studio strudel X.py → abre strudel.cc con el demo (--page: player local)
+    oc1studio new NAME     → crea demos/NAME.py
+    oc1studio list         → lista los demos
+    oc1studio git clone|status|commit|push|pull|add-remote|remotes
 """
 from __future__ import annotations
 
@@ -21,6 +21,7 @@ from . import gitops, settings
 from . import live_bridge
 from . import strudel as strudelio
 from . import synth
+from . import __version__, __credits__
 
 
 def _load_or_exit(path: str) -> demoio.Demo:
@@ -81,7 +82,7 @@ def cmd_live(args) -> None:
 def cmd_list(args) -> None:
     demos = demoio.list_demos(settings.get("demo_dir", "demos"))
     if not demos:
-        print("(sin demos — crea uno: op1studio new mi-demo)")
+        print("(sin demos — crea uno: oc1studio new mi-demo)")
         return
     for p in demos:
         print(f"● {p}")
@@ -123,9 +124,11 @@ def cmd_git(args) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        prog="op1studio",
-        description="OP-1 STUDIO — música en la terminal con estética Teenage Engineering.",
+        prog="oc1studio",
+        description="OC-1 STUDIO — música en la terminal con estética Teenage Engineering.",
     )
+    p.add_argument("--version", action="version",
+                   version=f"OC-1 STUDIO v{__version__} · {__credits__}")
     sub = p.add_subparsers(dest="cmd")
 
     c = sub.add_parser("play", help="reproduce un demo (.py)")

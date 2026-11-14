@@ -1,13 +1,13 @@
-"""chip_boy — demo OP-1 STUDIO (estilo chip: computadora vieja / 8-bit)
+"""chip_boy — demo OC-1 STUDIO (estilo chip: computadora vieja / 8-bit)
 
 Edita este archivo: ES tu demo. Cada pista es un Track(...).
 pattern: un token por semicorchea; '~' o '.' = silencio.
 Notas: c3, c#3, bb3 — percusión: kick, snare, hat, clap.
 Sonidos: sine, square, saw, tri, pluck, bell, fm, noise, kick, snare, hat, clap
-Reproduce: python -m op1studio play <archivo>
-Strudel:   python -m op1studio strudel <archivo>
+Reproduce: python -m oc1studio play <archivo>
+Strudel:   python -m oc1studio strudel <archivo>
 """
-from op1studio.demo import Demo, Track
+from oc1studio.demo import Demo, Track
 
 demo = Demo(
     title="chip_boy",

@@ -1,10 +1,11 @@
-"""Configuración persistente de OP-1 STUDIO (~/.op1studio/config.json)."""
+"""Configuración persistente de OC-1 STUDIO (~/.oc1studio/config.json)."""
 from __future__ import annotations
 
 import json
 from pathlib import Path
 
-CONFIG_DIR = Path.home() / ".op1studio"
+CONFIG_DIR = Path.home() / ".oc1studio"
+_OLD_DIR = Path.home() / ".op1studio"   # renombrado: migración silenciosa
 CONFIG_FILE = CONFIG_DIR / "config.json"
 
 DEFAULTS = {
@@ -14,8 +15,8 @@ DEFAULTS = {
     "auto_commit": False,       # commit automático en git al guardar
     "demo_dir": "demos",        # carpeta de demos (relativa a cwd)
     "volume": 0.9,
-    "live_send_port": 7647,     # OP-1 → Max for Live (notas)
-    "live_recv_port": 7648,     # Max for Live → OP-1 (reloj de 16avos)
+    "live_send_port": 7647,     # OC-1 → Max for Live (notas)
+    "live_recv_port": 7648,     # Max for Live → OC-1 (reloj de 16avos)
 }
 
 
@@ -25,10 +26,19 @@ def load() -> dict:
         cfg.update(json.loads(CONFIG_FILE.read_text(encoding="utf-8")))
     except Exception:  # noqa: BLE001 — config corrupta ⇒ valores por defecto
         pass
+    if not CONFIG_FILE.exists():
+        old = _OLD_DIR / "config.json"
+        if old.exists():  # migra la config de la era OP-1
+            try:
+                CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+                CONFIG_FILE.write_text(old.read_text(encoding="utf-8"))
+                cfg.update(json.loads(CONFIG_FILE.read_text(encoding="utf-8")))
+            except Exception:
+                pass
     # migración desde versiones anteriores
     a = str(cfg.get("accent", ""))
-    if a.startswith("op1-"):
-        cfg["accent"] = a.replace("op1-", "").replace("-light", "")
+    if a.startswith("oc1-"):
+        cfg["accent"] = a.replace("oc1-", "").replace("-light", "")
     if cfg.get("appearance") not in ("auto", "dark", "light"):
         cfg["appearance"] = DEFAULTS["appearance"]
     if cfg.get("accent") not in DEFAULTS.get("accent", "") and cfg["accent"] not in ("orange", "blue", "green", "white"):

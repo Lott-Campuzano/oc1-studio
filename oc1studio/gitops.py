@@ -1,4 +1,4 @@
-"""Operaciones git para OP-1 STUDIO (subprocess, sin dependencias).
+"""Operaciones git para OC-1 STUDIO (subprocess, sin dependencias).
 
 Clonar, guardar cambios (commit) y almacenar en remoto (push/pull).
 Funciona con GitHub vía HTTPS (token/PAT o credencial guardada) o SSH.
@@ -40,7 +40,7 @@ def init(path: Path) -> str:
         return "ya es un repositorio git"
     _run(["init"], path)
     _run(["add", "-A"], path, check=False)
-    r = _run(["commit", "-m", "OP-1 STUDIO: primer commit"], path, check=False)
+    r = _run(["commit", "-m", "OC-1 STUDIO: primer commit"], path, check=False)
     return "repositorio inicializado" + (f" · {r.splitlines()[0]}" if r else "")
 
 

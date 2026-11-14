@@ -24,7 +24,7 @@ def _shade(hex_color: str, factor: float) -> str:
 
 
 def make_theme(name: str, accent: str, dark: bool = True) -> Theme:
-    base = name.replace("op1-", "").replace("-light", "")
+    base = name.replace("oc1-", "").replace("-light", "")
     secondary = _PAIRS.get(base, "#00a8ff")
     if dark:
         return Theme(
@@ -45,7 +45,7 @@ def make_theme(name: str, accent: str, dark: bool = True) -> Theme:
                 "block-cursor-foreground": "#121212",
             },
         )
-    # claro — cara "OP-1 field" blanca con tinta grafito
+    # claro — cara "OC-1 field" blanca con tinta grafito
     a = _shade(accent, 0.75)
     return Theme(
         name=name,
@@ -69,21 +69,21 @@ def make_theme(name: str, accent: str, dark: bool = True) -> Theme:
 
 THEMES: dict[str, Theme] = {}
 for _k, _v in ACCENTS.items():
-    THEMES[f"op1-{_k}"] = make_theme(f"op1-{_k}", _v, dark=True)
-    THEMES[f"op1-{_k}-light"] = make_theme(f"op1-{_k}-light", _v, dark=False)
+    THEMES[f"oc1-{_k}"] = make_theme(f"oc1-{_k}", _v, dark=True)
+    THEMES[f"oc1-{_k}-light"] = make_theme(f"oc1-{_k}-light", _v, dark=False)
 
 
 def effective_theme(accent: str, mode: str) -> str:
     """accent='orange' + mode='dark'|'light' → nombre de tema Textual."""
-    return f"op1-{accent}-light" if mode == "light" else f"op1-{accent}"
+    return f"oc1-{accent}-light" if mode == "light" else f"oc1-{accent}"
 
 
 def accent_of(theme_name: str) -> str:
-    """'op1-orange-light' → 'orange' (nombre base del acento)."""
-    return theme_name.replace("op1-", "").replace("-light", "")
+    """'oc1-orange-light' → 'orange' (nombre base del acento)."""
+    return theme_name.replace("oc1-", "").replace("-light", "")
 
 
-# color del punto de cada pista según sonido (estética de teclas OP-1)
+# color del punto de cada pista según sonido (estética de teclas estilo TE)
 SOUND_COLORS = {
     "kick": "#00a8ff", "snare": "#00a8ff", "hat": "#00a8ff", "clap": "#00a8ff",
     "saw": "#ff5300", "square": "#ff5300", "sine": "#ff5300", "tri": "#ff5300", "fm": "#ff5300",
