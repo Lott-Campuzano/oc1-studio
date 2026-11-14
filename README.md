@@ -1,10 +1,16 @@
 # OP-1 STUDIO
 
+**¿Nuevo con la terminal y vienes de Ableton/FL/GarageBand?**
+Empieza por 👉 **[docs/GUIA-PRINCIPIANTES.md](docs/GUIA-PRINCIPIANTES.md)** —
+instalación y uso paso a paso, sin jerga, con equivalencias DAW ↔ OP-1 STUDIO.
+
 Estudio de música **en la terminal** con estética **Teenage Engineering** (OP-1):
 secuenciador de 16 pasos, encoders ASCII, **temas dinámicos** que siguen la
 apariencia de tu sistema (claro/oscuro), demos guardados como **archivos `.py`
 editables**, **puente a Ableton Live vía Max for Live** y **integración git**
 para clonar, guardar cambios y subirlos a GitHub.
+
+![OP-1 STUDIO](docs/captura-tui.svg)
 
 ```
 ● OP-1 STUDIO   demo: chip_boy   ·   140 BPM   ·   e minor   ·   ■   ·   white   ·   LIVE 07/16
