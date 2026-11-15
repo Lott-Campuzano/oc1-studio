@@ -24,10 +24,11 @@ import re
 from dataclasses import dataclass, field, fields
 from pathlib import Path
 
+# vocabulario del patrón: sonidos melódicos (tono) y de percusión (ritmo)
 MELODIC_SOUNDS = ("sine", "square", "saw", "tri", "pluck", "bell", "fm", "noise")
 DRUM_SOUNDS = ("kick", "snare", "hat", "clap")
 SOUNDS = MELODIC_SOUNDS + DRUM_SOUNDS
-FX_KEYS = ("reverb", "delay", "drive", "volume")
+FX_KEYS = ("reverb", "delay", "drive", "volume")   # orden canónico del dict fx
 
 
 class DemoError(Exception):
@@ -35,6 +36,7 @@ class DemoError(Exception):
 
 
 def _clamp(v, lo: float, hi: float) -> float:
+    """Fuerza v al rango [lo, hi]; NaN/None/basura → lo (mínimo)."""
     try:
         v = float(v)
     except (TypeError, ValueError):
@@ -53,6 +55,12 @@ class Track:
 
     @classmethod
     def from_obj(cls, obj) -> "Track":
+        """Acepta Track, dict o nada y devuelve una Track validada.
+
+        El dict puede traer claves de más (se filtran a los campos
+        reales del dataclass) y cualquier valor sucio se normaliza:
+        sonido desconocido → 'saw', nombre ≤16 chars, gain en [0, 1.5].
+        """
         if isinstance(obj, Track):
             t = obj
         elif isinstance(obj, dict):
@@ -62,11 +70,11 @@ class Track:
             raise DemoError(f"pista no válida: {obj!r}")
         sound = str(t.sound).lower()
         if sound not in SOUNDS:
-            sound = "saw"
+            sound = "saw"   # sonido inventado → el de fábrica
         return cls(
             name=str(t.name)[:16] or "syn",
             sound=sound,
-            pattern=str(t.pattern).strip() or "~",
+            pattern=str(t.pattern).strip() or "~",   # patrón vacío = silencio
             gain=_clamp(t.gain, 0.0, 1.5),
         )
 
@@ -75,8 +83,8 @@ class Track:
         toks = self.pattern.split() or ["~"]
         if steps is not None:
             if len(toks) < steps:
-                toks = toks + ["~"] * (steps - len(toks))
-            toks = toks[:steps]
+                toks = toks + ["~"] * (steps - len(toks))   # relleno con silencios
+            toks = toks[:steps]                             # o recorte al largo exacto
         return toks
 
 
@@ -95,15 +103,21 @@ class Demo:
 
     @classmethod
     def from_obj(cls, obj) -> "Demo":
+        """Valida y normaliza un demo desde Track, dict u otro Demo.
+
+        Es el filtro por el que pasa TODO: sin él, un demo del disco
+        podría romper el synth o el puente MIDI con valores imposibles.
+        """
         if isinstance(obj, Demo):
             d = obj
         elif isinstance(obj, dict):
-            allowed = {f.name for f in fields(cls)}
+            allowed = {f.name for f in fields(cls)}   # claves desconocidas → fuera
             d = cls(**{k: v for k, v in obj.items() if k in allowed})
         else:
             raise DemoError("demo no válido: define `demo = Demo(...)`")
 
         tracks = [Track.from_obj(t) for t in (d.tracks or [])] or [Track()]
+        # fx: solo las 4 claves conocidas, recortadas a [0, 1] y redondeadas
         raw_fx = dict(d.fx or {})
         fx = {k: round(_clamp(v, 0.0, 1.0), 2) for k, v in raw_fx.items() if k in FX_KEYS}
         style = str(getattr(d, "style", "clean")).lower()
@@ -111,20 +125,22 @@ class Demo:
             style = "clean"
         return cls(
             title=str(d.title)[:40] or "untitled",
-            bpm=round(_clamp(d.bpm, 20, 300), 1),
+            bpm=round(_clamp(d.bpm, 20, 300), 1),       # 20-300 bpm es lo musical
             key=str(d.key).lower()[:2] or "a",
             scale=str(d.scale).lower()[:12] or "minor",
-            steps=int(_clamp(d.steps, 1, 64)),
+            steps=int(_clamp(d.steps, 1, 64)),          # 1-64 pasos
             style=style,
             tracks=tracks,
             fx=fx,
         )
 
     def normalized(self) -> "Demo":
+        """Copia validada de sí mismo (para no mutar el original)."""
         return Demo.from_obj(self)
 
 
 def slugify(text: str) -> str:
+    """'¡Mi Demo!' → 'mi-demo': nombre seguro de archivo, ≤40 chars."""
     s = re.sub(r"[^a-z0-9]+", "-", str(text).lower()).strip("-")
     return (s or "untitled")[:40]
 
@@ -178,6 +194,8 @@ def chip_demo(title: str = "chip_boy") -> Demo:
     )
 
 
+# cabecera que se escribe dentro de cada .py guardado: la "carátula"
+# del demo, con la mini-referencia del formato
 _HEADER = '''"""{title} — demo OC-1 STUDIO
 
 Edita este archivo: ES tu demo. Cada pista es un Track(...).
@@ -197,11 +215,14 @@ def render(demo: Demo) -> str:
     d = demo.normalized()
 
     def q(s: str) -> str:
+        """Cadena → literal Python con comillas escapadas."""
         return '"' + str(s).replace("\\", "\\\\").replace('"', '\\"') + '"'
 
     def num(x) -> str:
+        """Número compacto: 0.9 y no 0.90000000000000002."""
         return f"{float(x):g}"
 
+    # el título entra en un docstring: neutraliza comillas triples
     lines = [_HEADER.format(title=d.title.replace('"""', "''"), sounds=", ".join(SOUNDS))]
     lines.append("demo = Demo(")
     lines.append(f"    title={q(d.title)},")
@@ -209,7 +230,7 @@ def render(demo: Demo) -> str:
     lines.append(f"    key={q(d.key)},")
     lines.append(f"    scale={q(d.scale)},")
     lines.append(f"    steps={int(d.steps)},")
-    if d.style == "chip":
+    if d.style == "chip":        # el estilo se omite si es el default 'clean'
         lines.append('    style="chip",')
     lines.append("    tracks=[")
     for t in d.tracks:
@@ -219,12 +240,16 @@ def render(demo: Demo) -> str:
         lines.append(f"            gain={num(t.gain)},")
         lines.append("        ),")
     lines.append("    ],")
+    # fx en orden canónico (reverb, delay, drive, volume) y extras al final
     ordered = [k for k in FX_KEYS if k in d.fx] + [k for k in d.fx if k not in FX_KEYS]
     lines.append("    fx={" + ", ".join(f"{q(k)}: {num(d.fx[k])}" for k in ordered) + "},")
     lines.append(")")
     return "\n".join(lines) + "\n"
 
 
+# detecta los imports de oc1studio en el código del demo: el loader
+# ya inyecta Demo/Track en el namespace, así que esos imports sobran
+# (y permitirlos ejecutaría código arbitrario del archivo)
 _IMPORT_RE = re.compile(
     r"^\s*(?:from\s+oc1studio[\w.]*\s+import\s+[\w, ]+|import\s+oc1studio[\w.]*).*$",
     re.M,
@@ -232,7 +257,13 @@ _IMPORT_RE = re.compile(
 
 
 def load(path: str | Path) -> Demo:
-    """Ejecuta el archivo .py y devuelve el Demo validado."""
+    """Ejecuta el archivo .py y devuelve el Demo validado.
+
+    Es un exec acotado: el src corre en un namespace propio donde
+    solo existen Demo y Track (por eso se borran sus imports del
+    archivo). Cualquier excepción del usuario se traduce a DemoError
+    con el archivo y la línea en el mensaje.
+    """
     path = Path(path)
     src = path.read_text(encoding="utf-8")
     src = _IMPORT_RE.sub("", src)  # el loader ya aporta Demo/Track
@@ -250,6 +281,7 @@ def load(path: str | Path) -> Demo:
 
 
 def save(demo: Demo, path: str | Path) -> Path:
+    """render() → archivo: crea la carpeta si no existe."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(render(demo), encoding="utf-8")
@@ -257,6 +289,7 @@ def save(demo: Demo, path: str | Path) -> Path:
 
 
 def list_demos(directory: str | Path) -> list[Path]:
+    """Los .py de una carpeta, ordenados sin distinguir mayúsculas."""
     d = Path(directory)
     if not d.is_dir():
         return []

@@ -3,6 +3,17 @@
 Layout: TRACKS | secuenciador + cinta | ENCODERS + preview Strudel.
 Teclas: espacio ▶/■ · s guardar · l abrir · e strudel · w player · g git
         o ajustes · a/d pistas · t preset · c color · q salir.
+
+Mapa del archivo:
+  PRESETS/ENCODERS ... datos de fábrica (pistas rápidas y knobs fx)
+  TopBar ............. barra superior: estado en una línea de texto
+  Encoder ............ knob giratorio ASCII, foco con ↑/↓/⏎
+  PatternScreen ...... modal para editar el patrón de una pista
+  OpenScreen ......... modal para abrir un demo de la carpeta
+  GitScreen .......... modal con commit/push/pull/clone y log
+  SettingsScreen ..... modal de ajustes (tema, color, puertos…)
+  StudioScreen ....... la pantalla principal: grid + transporte
+  OP1App ............. el cerebro: estado global, bindings y acciones
 """
 from __future__ import annotations
 
@@ -28,6 +39,8 @@ from . import synth
 from .demo import DemoError, slugify
 
 # ----------------------------------------------------------------- presets
+# Pistas listas para montar con la tecla t (presets): percusión y
+# melodías típicas. Cada dict alimenta un Track completo.
 
 PRESETS = [
     dict(name="kick", sound="kick",
@@ -50,7 +63,7 @@ PRESETS = [
          pattern="~ ~ ~ n ~ ~ ~ ~ ~ ~ ~ n ~ ~ ~ ~"),
 ]
 
-ENCODERS = [  # (clave fx, etiqueta, color TE)
+ENCODERS = [  # (clave fx del demo, etiqueta visible, color TE del knob)
     ("reverb", "REVERB", "#00d26a"),
     ("delay", "DELAY", "#f0f0f0"),
     ("drive", "DRIVE", "#ff5300"),
@@ -64,6 +77,7 @@ class TopBar(Static):
     """Barra superior estilo OC-1: punto de color + estado."""
 
     def update_state(self, app: "OP1App") -> None:
+        """Redibuja la barra con acento, demo y estado de reproducción/LIVE."""
         accent = theme.ACCENTS.get(theme.accent_of(app.theme), "#ff5300")
         t = app.demo
         state = "▶" if app._playing else "■"
@@ -78,6 +92,7 @@ class TopBar(Static):
                    f"{'/claro' if 'light' in app.theme else ''}",
                    style=Style(color="#6a6a6a"))
         if app._bridge is not None:
+            # sección LIVE: verde si Ableton manda reloj (<2 s), gris si no
             live_ok = app._bridge.alive_clock
             txt.append("   ·   LIVE", style=Style(
                 color="#00d26a" if live_ok else "#8a8a8a", bold=True))
@@ -107,14 +122,16 @@ class Encoder(Static, can_focus=True):
         self.redraw()
 
     def set_value(self, v: float) -> None:
+        """Recorta a [0, 1] y redibuja (el valor vive aquí, no en el fx)."""
         self.value = round(max(0.0, min(1.0, v)), 2)
         self.redraw()
 
     def redraw(self) -> None:
+        """Pinta el knob como matriz 3×3 con el punto en su posición."""
         frac = self.value
         ring = [0, 1, 2, 5, 8, 7, 6, 3]  # sentido horario en matriz 3×3
         cells = [" "] * 9
-        cells[ring[min(7, round(frac * 7))]] = "●"
+        cells[ring[min(7, round(frac * 7))]] = "●"   # 0% arriba-izq … 100% arriba-der
         art = (
             f"╭───╮\n"
             f"│{cells[0]}{cells[1]}{cells[2]}│\n"
@@ -128,6 +145,7 @@ class Encoder(Static, can_focus=True):
         self.update(content)
 
     def _turn(self, delta: float) -> None:
+        """Gira el knob ±delta y sincroniza el fx del demo en vivo."""
         self.set_value(self.value + delta)
         self.app.sync_fx(self.fx_key, self.value)
 
@@ -178,7 +196,8 @@ class PatternScreen(ModalScreen):
             self.app.pop_screen()
 
     def _apply(self) -> None:
-        val = self.query_one("#pat-in", Input).value.strip() or "~"
+        """Escribe el patrón en la pista y refresca toda la pantalla."""
+        val = self.query_one("#pat-in", Input).value.strip() or "~"   # vacío = silencio
         self.app.demo.tracks[self.track_index].pattern = val
         self.app.pop_screen()
         self.app.main_screen.refresh_all()
@@ -200,6 +219,7 @@ class OpenScreen(ModalScreen):
             yield Button("CERRAR esc", id="open-close", classes="btn b-white")
 
     def on_mount(self) -> None:
+        """Rellena la lista con los .py de la carpeta de demos."""
         self._files = demoio.list_demos(self.app.demo_dir())
         lv = self.query_one("#open-list", ListView)
         for p in self._files:
@@ -247,6 +267,11 @@ class GitScreen(ModalScreen):
         self.query_one("#git-out", Log).write(text)
 
     def _run(self, fn: Callable[[], str]) -> None:
+        """Ejecuta una operación git en un hilo worker (git puede tardar).
+
+        exclusive=True cancela la operación anterior del grupo 'git',
+        y el resultado vuelve a la UI con call_from_thread.
+        """
         def work() -> None:
             try:
                 out = fn()
@@ -320,16 +345,18 @@ class SettingsScreen(ModalScreen):
             yield Static("hecho con GLM-5.3-Flash-Free + OpenCode", classes="hint credit")
 
     def on_radio_set_changed(self, event: RadioSet.Changed) -> None:
+        """Radios de apariencia/acento → aplicar al vuelo (sin botón guardar)."""
         rid = event.pressed.id or ""
         if rid.startswith("md-"):
-            self.app.set_appearance(rid[3:])
+            self.app.set_appearance(rid[3:])    # 'md-dark' → 'dark'
         elif rid.startswith("ac-"):
-            self.app.set_accent(rid[3:])
+            self.app.set_accent(rid[3:])        # 'ac-blue' → 'blue'
 
     def on_checkbox_changed(self, event: Checkbox.Changed) -> None:
         settings.update(auto_commit=event.value)
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
+        """⏎ en un input guarda su valor (carpeta de demos o puertos LIVE)."""
         iid = event.input.id or ""
         if iid == "opt-demodir":
             settings.update(demo_dir=event.value.strip() or "demos")
@@ -338,6 +365,7 @@ class SettingsScreen(ModalScreen):
             try:
                 port = int(event.value)
                 key = "live_send_port" if iid == "opt-send" else "live_recv_port"
+                # puertos de usuario (≥1024) y válidos TCP/UDP
                 settings.update(**{key: max(1024, min(65535, port))})
                 self.app.notify(f"● {key}: {port} (reinicia LIVE con v)")
             except ValueError:
@@ -353,9 +381,16 @@ class SettingsScreen(ModalScreen):
 # ----------------------------------------------------------------- pantalla principal
 
 class StudioScreen(Screen):
-    """Pantalla principal del estudio."""
+    """Pantalla principal del estudio.
+
+    Tres columnas (CSS de OP1App): pistas a la izquierda, grid de
+    16 pasos + cinta + transporte al centro, encoders y preview
+    de código Strudel a la derecha. Los handlers on_* de esta
+    clase traducen clics/⏎ del usuario a acciones del app.
+    """
 
     def compose(self) -> ComposeResult:
+        """Estructura estática del estudio (se monta una vez)."""
         app = self.app
         yield TopBar(id="topbar")
         with Horizontal(id="main"):
@@ -367,8 +402,8 @@ class StudioScreen(Screen):
                     yield Button("–", id="btn-del", classes="btn b-white")
                     yield Button("PRESET", id="btn-preset", classes="btn b-orange")
             with Vertical(id="center"):
-                yield DataTable(id="grid", cursor_type="cell")
-                yield Static(id="tape", classes="tape")
+                yield DataTable(id="grid", cursor_type="cell")   # la rejilla de pasos
+                yield Static(id="tape", classes="tape")          # onda ASCII al reproducir
                 with Horizontal(id="transport"):
                     yield Input(id="in-bpm", classes="tin")
                     yield Input(id="in-key", classes="tin")
@@ -379,7 +414,7 @@ class StudioScreen(Screen):
                     yield Encoder(key, label, color)
                 yield Static("STRUDEL ←", classes="panel-label label-green")
                 with VerticalScroll(id="sdx-wrap"):
-                    yield Static(id="sdx")
+                    yield Static(id="sdx")   # código strudel en vivo
         yield Footer()
 
     def on_mount(self) -> None:
@@ -389,6 +424,7 @@ class StudioScreen(Screen):
     # ---- refresco
 
     def refresh_all(self) -> None:
+        """Repinta los 6 paneles: el mismo orden que compose() los creó."""
         self.build_grid()
         self.refresh_tracks()
         self.refresh_encoders()
@@ -397,12 +433,18 @@ class StudioScreen(Screen):
         self.update_topbar()
 
     def update_topbar(self) -> None:
+        """Solo la barra superior (barato: se llama a cada cambio)."""
         self.query_one("#topbar", TopBar).update_state(self.app)
 
     def build_grid(self) -> None:
+        """La rejilla del secuenciador: fila por pista, columna por paso.
+
+        Tokens '~' se pintan grises y todo lo demás en tinta clara
+        con el punto de color del sonido de la pista a la izquierda.
+        """
         app = self.app
         grid = self.query_one("#grid", DataTable)
-        grid.clear(columns=True)
+        grid.clear(columns=True)   # reconstrucción completa (simple y fiable)
         grid.add_column("PISTA", key="name")
         for i in range(app.demo.steps):
             grid.add_column(f"{i + 1}", key=f"s{i}")
@@ -416,6 +458,7 @@ class StudioScreen(Screen):
             grid.add_row(*row)
 
     def refresh_tracks(self) -> None:
+        """Columna izquierda: nombre + sonido de cada pista con su LED."""
         lv = self.query_one("#tracks", ListView)
         lv.clear()
         for t in self.app.demo.tracks:
@@ -426,21 +469,25 @@ class StudioScreen(Screen):
             lv.append(ListItem(Label(dot)))
 
     def refresh_encoders(self) -> None:
+        """Vuelta de los knobs a los valores fx del demo."""
         for key, _label, _color in ENCODERS:
             enc = self.query_one(f"#enc-{key}", Encoder)
             enc.set_value(self.app.demo.fx.get(key, 0.0))
 
     def refresh_transport(self) -> None:
+        """Inputs del transporte: bpm, tonalidad y escala del demo."""
         d = self.app.demo
         self.query_one("#in-bpm", Input).value = f"{d.bpm:g}"
         self.query_one("#in-key", Input).value = d.key
         self.query_one("#in-scale", Input).value = d.scale
 
     def refresh_sdx(self) -> None:
+        """Panel derecho: el demo traducido a código Strudel, en vivo."""
         code = strudelio.to_strudel(self.app.demo)
         self.query_one("#sdx", Static).update(Text(code.rstrip(), style=Style(color="#7bd88f")))
 
     def show_tape(self, preview: str) -> None:
+        """La 'cinta' bajo el grid: onda ASCII del último render."""
         state = "▶" if self.app._playing else "■"
         tape = Text()
         tape.append(f"{state} ", style=Style(color="#ff5300", bold=True))
@@ -451,6 +498,7 @@ class StudioScreen(Screen):
     # ---- interacciones
 
     def sel_track_index(self) -> int:
+        """Índice de pista seleccionada en la lista (0 si nada elegido)."""
         lv = self.query_one("#tracks", ListView)
         i = lv.index
         if i is None or not (0 <= i < len(self.app.demo.tracks)):
@@ -458,17 +506,20 @@ class StudioScreen(Screen):
         return i
 
     def on_list_view_selected(self, event: ListView.Selected) -> None:
+        """⏎/clic en una pista de la lista → abre el editor de patrón."""
         if event.list_view.id == "tracks":
             i = event.list_view.index
             if i is not None:
                 self.app.push_screen(PatternScreen(i))
 
     def on_data_table_cell_selected(self, event: DataTable.CellSelected) -> None:
+        """Clic en una celda del grid → editor de patrón de esa fila/pista."""
         row = event.coordinate.row
         if 0 <= row < len(self.app.demo.tracks):
             self.app.push_screen(PatternScreen(row))
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
+        """⏎ en bpm/tonalidad/escala: valida, aplica y repinta."""
         iid = event.input.id or ""
         d = self.app.demo
         try:
@@ -488,6 +539,7 @@ class StudioScreen(Screen):
         self.update_topbar()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
+        """Los tres botones de la izquierda delegan en las acciones del app."""
         app = self.app
         bid = event.button.id or ""
         if bid == "btn-add":
@@ -501,9 +553,18 @@ class StudioScreen(Screen):
 # ----------------------------------------------------------------- App
 
 class OP1App(App):
+    """El cerebro de la TUI: estado global, atajos y ciclo de vida.
+
+    Todo lo que no es dibujo vive aquí: el demo actual, el proceso
+    de audio, el servidor strudel y el puente LIVE. Las pantallas
+    (StudioScreen + modales) solo pintan y delegan en estas acciones.
+    """
+
     TITLE = "OC-1 STUDIO"
     CSS_PATH = None
 
+    # layout en Textual CSS: 3 columnas fijas (30 / resto / 26) y
+    # diálogos modales centrados con borde redondeado
     CSS = """
     #topbar { height: 1; background: $panel; padding: 0 1; }
     #main { height: 1fr; }
@@ -538,7 +599,7 @@ class OP1App(App):
     CheckBox { height: 3; }
     """
 
-    BINDINGS = [
+    BINDINGS = [   # los atajos que el Footer muestra abajo — la cara del teclado
         Binding("space", "play", "▶/■"),
         Binding("s", "save", "GUARDAR"),
         Binding("l", "open", "ABRIR"),
@@ -558,24 +619,26 @@ class OP1App(App):
 
     def __init__(self, demo: demoio.Demo | None = None, demo_path: str | Path | None = None):
         super().__init__()
-        self.demo = (demo or demoio.default_demo()).normalized()
-        self.demo_path = Path(demo_path) if demo_path else None
-        self._proc: subprocess.Popen | None = None
+        self.demo = (demo or demoio.default_demo()).normalized()   # siempre un demo válido
+        self.demo_path = Path(demo_path) if demo_path else None    # de dónde se cargó (para guardar encima)
+        self._proc: subprocess.Popen | None = None    # proceso del player de audio
         self._playing = False
-        self._play_id = 0
+        self._play_id = 0                             # token anti-carrera del render
         self._server: strudelio.StrudelServer | None = None
-        self._preset_i = 0
+        self._preset_i = 0                            # índice del preset girado por 't'
         self._bridge: live_bridge.LiveBridge | None = None
-        self._live_step = -1
+        self._live_step = -1                          # último paso visto de Ableton
         self.main_screen: StudioScreen | None = None
 
     # ---- ciclo de vida
 
     def get_default_screen(self) -> StudioScreen:
+        """Textual pide la pantalla inicial: guárdala como main_screen."""
         self.main_screen = StudioScreen()
         return self.main_screen
 
     def on_mount(self) -> None:
+        """Registra los 8 temas y aplica el guardado en la config."""
         for t in theme.THEMES.values():
             self.register_theme(t)
         cfg = settings.load()
@@ -586,18 +649,21 @@ class OP1App(App):
         self.set_interval(5.0, self._check_system_theme)
 
     def _theme_name(self) -> str:
+        """Acento + modo ('auto' pregunta al SO) → nombre de tema Textual."""
         mode = self._appearance
         if mode == "auto":
             mode = system_theme.detect_system_mode()
         return theme.effective_theme(self._accent, mode)
 
     def reapply_theme(self) -> None:
+        """Reaplica tema + persiste la elección + refresca la topbar."""
         self.theme = self._theme_name()
         settings.update(appearance=self._appearance, accent=self._accent)
         if self.main_screen is not None:
             self.main_screen.update_topbar()
 
     def _check_system_theme(self) -> None:
+        """Cada 5 s (solo en 'auto'): ¿el SO cambió de claro/oscuro?"""
         if self._appearance != "auto":
             return
         system_theme.invalidate_cache()
@@ -622,6 +688,7 @@ class OP1App(App):
         self._teardown()
 
     def _teardown(self) -> None:
+        """Limpieza total al salir: player, servidor strudel y puente LIVE."""
         if self._proc is not None and self._proc.poll() is None:
             self._proc.terminate()
         self._proc = None
@@ -633,12 +700,14 @@ class OP1App(App):
             self._bridge = None
 
     def action_quit(self) -> None:
+        """q / ctrl+q: limpiar y cerrar."""
         self._teardown()
         self.exit()
 
     # ---- utilidades
 
     def demo_dir(self) -> Path:
+        """Carpeta de demos resuelta (absoluta, relativa al cwd si hace falta)."""
         d = Path(str(settings.get("demo_dir", "demos"))).expanduser()
         return d if d.is_absolute() else Path.cwd() / d
 
@@ -650,6 +719,7 @@ class OP1App(App):
         return (self.demo_dir().resolve().parent)
 
     def sync_fx(self, key: str, value: float) -> None:
+        """Un encoder giró: escribe el fx en el demo y refresca el strudel."""
         self.demo.fx[key] = round(value, 2)
         if self.main_screen is not None:
             self.main_screen.refresh_sdx()
@@ -663,6 +733,10 @@ class OP1App(App):
     # ---- acciones
 
     def action_play(self) -> None:
+        """Espacio: alterna play/stop. Si suena, mata el player; si no,
+        lanza el render en un worker (el WAV tarda, no congeles la UI).
+        _play_id actúa de token: cada pulsación invalida el render anterior.
+        """
         proc = self._proc
         if proc is not None and proc.poll() is None:
             proc.terminate()
@@ -678,6 +752,7 @@ class OP1App(App):
                         thread=True, exclusive=True, group="audio", name="render")
 
     def _render_and_play(self, token: int) -> None:
+        """Worker de fondo: renderiza el demo a WAV (puede tardar)."""
         try:
             path, samples = synth.render_to_cache(self.demo)
             preview = synth.wave_preview(samples, 72)
@@ -689,6 +764,7 @@ class OP1App(App):
         self.call_from_thread(self._on_rendered, path, preview, token)
 
     def _on_rendered(self, path: Path, preview: str, token: int) -> None:
+        """De vuelta en la UI: pinta la cinta y lanza el player del SO."""
         if token != self._play_id:
             return
         self._playing = True
@@ -700,6 +776,7 @@ class OP1App(App):
             self.notify(f"✗ player: {e}", severity="error")
 
     def action_save(self) -> None:
+        """s / ctrl+s: guarda el .py y (si aplica) auto-commitea en git."""
         path = self.demo_path or (self.demo_dir() / f"{slugify(self.demo.title)}.py")
         try:
             demoio.save(self.demo, path)
@@ -709,6 +786,7 @@ class OP1App(App):
         self.demo_path = Path(path)
         self.notify(f"● guardado → {path.name}")
         self._sync_bridge()
+        # auto-commit opcional: git también puede tardar → worker propio
         if settings.get("auto_commit") and gitops.is_repo(self.workspace):
             def work() -> None:
                 out = gitops.auto_commit(self.workspace, self.demo.title)
@@ -718,9 +796,11 @@ class OP1App(App):
             self.main_screen.update_topbar()
 
     def action_open(self) -> None:
+        """l: abre el modal con la lista de demos."""
         self.push_screen(OpenScreen())
 
     def do_open(self, path: Path) -> None:
+        """Carga un demo elegido en OpenScreen y repinta todo."""
         try:
             d = demoio.load(path)
         except DemoError as e:
@@ -735,11 +815,13 @@ class OP1App(App):
         self.notify(f"● {d.title} cargado")
 
     def action_strudel(self) -> None:
+        """e: abre strudel.cc con el demo embebido en la url."""
         url = strudelio.share_url(self.demo)
         webbrowser.open(url)
         self.notify("● strudel.cc abierto — dale PLAY en el navegador")
 
     def action_strudel_page(self) -> None:
+        """w: player local propio; si ya corre, solo actualiza su página."""
         if self._server is None:
             self._server = strudelio.launch_player(self.demo)
         else:
@@ -748,12 +830,15 @@ class OP1App(App):
         self.notify(f"● player local → {self._server.url}")
 
     def action_git(self) -> None:
+        """g: panel git."""
         self.push_screen(GitScreen())
 
     def action_settings(self) -> None:
+        """o: panel de ajustes."""
         self.push_screen(SettingsScreen())
 
     def action_add_track(self) -> None:
+        """a / botón +: añade una pista saw de fábrica."""
         n = len(self.demo.tracks) + 1
         t = demoio.Track(name=f"syn{n}", sound="saw", pattern="c3 ~ e3 ~ g3 ~", gain=0.8)
         self.demo.tracks.append(t)
@@ -761,6 +846,7 @@ class OP1App(App):
         self.notify(f"● +track: {t.name}")
 
     def action_del_track(self) -> None:
+        """d / botón –: borra la pista seleccionada (siempre queda ≥1)."""
         if len(self.demo.tracks) <= 1:
             self.notify("✗ mínimo 1 pista", severity="warning")
             return
@@ -770,6 +856,7 @@ class OP1App(App):
         self.notify(f"● –track: {gone.name}")
 
     def action_cycle_preset(self) -> None:
+        """t: girar presets sobre la pista seleccionada (kick → snare → …)."""
         p = PRESETS[self._preset_i % len(PRESETS)]
         self._preset_i += 1
         i = self.main_screen.sel_track_index()  # type: ignore[union-attr]
@@ -779,6 +866,7 @@ class OP1App(App):
         self.notify(f"● preset → {p['name']} (pista {t.name})")
 
     def action_cycle_theme(self) -> None:
+        """c: gira el acento orange → blue → green → white → …"""
         names = list(theme.ACCENTS)
         try:
             i = (names.index(self._accent) + 1) % len(names)
@@ -790,6 +878,7 @@ class OP1App(App):
     # ---- LIVE (Ableton / Max for Live)
 
     def action_toggle_live(self) -> None:
+        """v: enciende/apaga el puente con Ableton (lo decide el usuario)."""
         if self._bridge is not None:
             self._bridge.stop()
             self._bridge = None
@@ -813,9 +902,10 @@ class OP1App(App):
         """Hilo del puente: envía las notas del paso y actualiza la UI."""
         if self._bridge is not None:
             self._bridge.send_step(step)
-        self.call_from_thread(self._live_step_ui, step)
+        self.call_from_thread(self._live_step_ui, step)   # la UI solo se toca desde el hilo de Textual
 
     def _live_step_ui(self, step: int) -> None:
+        """Parte UI del reloj LIVE (ya en el hilo correcto)."""
         self._live_step = step
         if self.main_screen is not None:
             self.main_screen.update_topbar()

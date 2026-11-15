@@ -9,6 +9,10 @@ Strudel:   python -m oc1studio strudel <archivo>
 """
 from oc1studio.demo import Demo, Track
 
+# demo de fábrica "limpio": acid bass (sierra) + bells sobre un
+# groove 808. reverb y delay moderados, poco drive.
+# nota: si guardas encima desde la TUI (s), el archivo se
+# regenera limpio y estos comentarios se pierden.
 demo = Demo(
     title="acid_808",
     bpm=126,
@@ -18,27 +22,27 @@ demo = Demo(
     tracks=[
         Track(
             name="kick", sound="kick",
-            pattern="kick ~ ~ ~ kick ~ ~ ~ kick ~ ~ ~ kick ~ kick ~",
+            pattern="kick ~ ~ ~ kick ~ ~ ~ kick ~ ~ ~ kick ~ kick ~",   # four-on-the-floor con esquina
             gain=1,
         ),
         Track(
             name="hats", sound="hat",
-            pattern="~ ~ hat ~ hat ~ hat ~ hat ~ hat ~ hat ~ hat ~ hat hat",
+            pattern="~ ~ hat ~ hat ~ hat ~ hat ~ hat ~ hat ~ hat ~ hat hat",   # offbeat
             gain=0.5,
         ),
         Track(
             name="snare", sound="snare",
-            pattern="~ ~ ~ ~ snare ~ ~ ~ ~ ~ ~ ~ snare clap ~ ~",
+            pattern="~ ~ ~ ~ snare ~ ~ ~ ~ ~ ~ ~ snare clap ~ ~",   # snare + clap a contratiempo
             gain=0.8,
         ),
         Track(
             name="acid", sound="saw",
-            pattern="a1 a1 ~ a2 ~ a1 ~ g1 ~ a1 a1 ~ bb1 ~ a2 ~ ~ e2",
+            pattern="a1 a1 ~ a2 ~ a1 ~ g1 ~ a1 a1 ~ bb1 ~ a2 ~ ~ e2",   # bajo ácido en La menor
             gain=0.75,
         ),
         Track(
             name="bell", sound="bell",
-            pattern="~ ~ a4 ~ ~ ~ e5 ~ ~ ~ c5 ~ ~ ~ a4 ~",
+            pattern="~ ~ a4 ~ ~ ~ e5 ~ ~ ~ c5 ~ ~ ~ a4 ~",   # campanas arriba del bajo
             gain=0.45,
         ),
     ],

@@ -8,24 +8,33 @@ from __future__ import annotations
 
 from textual.theme import Theme
 
+# los cuatro acentos de tecla del OP-1, con nombre
 ACCENTS = {
     "orange": "#ff5300",
     "blue": "#00a8ff",
     "green": "#00d26a",
     "white": "#f0f0f0",
 }
+# color secundario de cada acento (su par opuesto para elementos UI)
 _PAIRS = {"orange": "#00a8ff", "blue": "#ff5300", "green": "#f0f0f0", "white": "#00a8ff"}
 
 
 def _shade(hex_color: str, factor: float) -> str:
+    """Oscurece un hex (#rrggbb) multiplicando cada canal por factor (<1)."""
     h = hex_color.lstrip("#")
     r, g, b = (int(h[i:i + 2], 16) for i in (0, 2, 4))
     return "#{:02x}{:02x}{:02x}".format(int(r * factor), int(g * factor), int(b * factor))
 
 
 def make_theme(name: str, accent: str, dark: bool = True) -> Theme:
-    base = name.replace("oc1-", "").replace("-light", "")
-    secondary = _PAIRS.get(base, "#00a8ff")
+    """Construye un tema Textual completo a partir de un acento.
+
+    dark=True  → panel negro carbón con acento a plena saturación
+    dark=False → cara 'OC-1 field' blanca; los acentos se apagan un
+                 poco (_shade) para no vibrar sobre el fondo claro
+    """
+    base = name.replace("oc1-", "").replace("-light", "")   # nombre limpio
+    secondary = _PAIRS.get(base, "#00a8ff")                 # color par
     if dark:
         return Theme(
             name=name,
@@ -67,10 +76,11 @@ def make_theme(name: str, accent: str, dark: bool = True) -> Theme:
     )
 
 
+# registrar los 8 temas (4 acentos × oscuro/claro) de una pasada
 THEMES: dict[str, Theme] = {}
 for _k, _v in ACCENTS.items():
-    THEMES[f"oc1-{_k}"] = make_theme(f"oc1-{_k}", _v, dark=True)
-    THEMES[f"oc1-{_k}-light"] = make_theme(f"oc1-{_k}-light", _v, dark=False)
+    THEMES[f"oc1-{_k}"] = make_theme(f"oc1-{_k}", _v, dark=True)          # 'oc1-orange'
+    THEMES[f"oc1-{_k}-light"] = make_theme(f"oc1-{_k}-light", _v, dark=False)   # 'oc1-orange-light'
 
 
 def effective_theme(accent: str, mode: str) -> str:
@@ -83,7 +93,8 @@ def accent_of(theme_name: str) -> str:
     return theme_name.replace("oc1-", "").replace("-light", "")
 
 
-# color del punto de cada pista según sonido (estética de teclas estilo TE)
+# color del punto de cada pista según sonido (estética de teclas estilo TE):
+# percusión azul · synths naranja · melódicos verdes · ruido blanco
 SOUND_COLORS = {
     "kick": "#00a8ff", "snare": "#00a8ff", "hat": "#00a8ff", "clap": "#00a8ff",
     "saw": "#ff5300", "square": "#ff5300", "sine": "#ff5300", "tri": "#ff5300", "fm": "#ff5300",
@@ -92,4 +103,5 @@ SOUND_COLORS = {
 
 
 def sound_color(sound: str) -> str:
+    """Color de LED para un tipo de sonido; gris neutro si no está mapeado."""
     return SOUND_COLORS.get(sound, "#e8e6e3")

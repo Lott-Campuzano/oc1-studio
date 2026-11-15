@@ -3,5 +3,7 @@
 Motores: sintetizador local (stdlib) y Strudel (navegador).
 Demos: archivos .py editables. Integración git para clonar/guardar/push.
 """
+# metadatos del paquete — pip los lee (`pip show oc1studio`) y la CLI
+# los imprime en su `--version`
 __version__ = "0.2.0"
 __credits__ = "Hecho con GLM-5.3-Flash-Free y OpenCode"
