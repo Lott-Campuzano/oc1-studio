@@ -15,6 +15,10 @@ from urllib.parse import quote
 
 from .demo import Demo, DRUM_SOUNDS
 
+# traducción de sonidos OC-1 → vocabulario de Strudel:
+# DRUM_MAP  percusión OC-1 → samples estándar de strudel (bd, sn, hh…)
+# SOUND_MAP ondas limpias → osciladores de strudel ('saw' → 'sawtooth')
+# CHIP_MAP  estilo 8-bit: todo se aplana a cuadradas/triángulos toscos
 DRUM_MAP = {"kick": "bd", "snare": "sn", "hat": "hh", "clap": "cp",
             "ride": "rd", "tom": "lt", "rim": "rs", "perc": "perc"}
 SOUND_MAP = {"sine": "sine", "square": "square", "saw": "sawtooth", "tri": "triangle",
@@ -22,7 +26,7 @@ SOUND_MAP = {"sine": "sine", "square": "square", "saw": "sawtooth", "tri": "tria
 CHIP_MAP = {"sine": "triangle", "square": "square", "saw": "square", "tri": "triangle",
             "pluck": "square", "bell": "triangle", "fm": "square", "noise": "noise"}
 DRUM_MAP = {"kick": "bd", "snare": "sn", "hat": "hh", "clap": "cp",
-            "ride": "rd", "tom": "lt", "rim": "rs", "perc": "perc"}
+            "ride": "rd", "tom": "lt", "rim": "rs", "perc": "perc"}   # redefinición idéntica (inofensiva: misma tabla)
 
 
 def _mini(pattern: str, drum: bool = False) -> str:
@@ -39,9 +43,16 @@ def _mini(pattern: str, drum: bool = False) -> str:
 
 
 def to_strudel(demo: Demo) -> str:
-    """Genera el código Strudel equivalente al demo."""
+    """Genera el código Strudel equivalente al demo.
+
+    Una línea `$: …` por pista: sample de percusión u oscilador con
+    nota; luego gain/room/delay según la pista y el fx global. En
+    estilo chip se añaden coarse/crush (menos bits, reloj más tosco).
+    """
     d = demo.normalized()
     chip = d.style == "chip"
+    # setcpm define el tempo de strudel: ciclos por minuto = bpm/4
+    # (un ciclo = un compás de 4 tiempos)
     lines = [f"setcpm({d.bpm:g}/4)"]
     fx = d.fx
     room = fx.get("reverb", 0.0)
@@ -51,19 +62,19 @@ def to_strudel(demo: Demo) -> str:
         pat = _mini(t.pattern, drum)
         parts = []
         if drum:
-            parts.append(f's("{pat}")')
+            parts.append(f's("{pat}")')   # s() = samples de batería
             if chip:
-                parts.append(".coarse(12)")
+                parts.append(".coarse(12)")   # sampleo a 1/12 de tasa
         else:
-            parts.append(f'note("{pat}")')
+            parts.append(f'note("{pat}")')   # note() = tono melódico
             sound = CHIP_MAP.get(t.sound, "square") if chip else SOUND_MAP.get(t.sound, "square")
             parts.append(f'.s("{sound}")')
             if chip:  # computadora vieja: menos bits, reloj más tosco
                 parts.append(".coarse(8).crush(4)")
         if t.gain != 1.0:
-            parts.append(f".gain({t.gain:g})")
+            parts.append(f".gain({t.gain:g})")   # gain de la pista → gain de strudel
         if room > 0.01:
-            parts.append(f".room({room:g})")
+            parts.append(f".room({room:g})")     # reverb global aplicado por pista
         if delay > 0.01:
             parts.append(f".delay({delay:g})")
         lines.append("$: " + "".join(parts))
@@ -77,6 +88,9 @@ def share_url(demo: Demo) -> str:
 
 
 # ---------------------------------------------------------------- player local
+# Página del player: HTML+CSS con estética TE (barra de LEDs, botones
+# de color) y el web component <strudel-editor> de @strudel/repl —
+# el audio lo genera el navegador, este servidor solo entrega el HTML.
 
 _PLAYER_HTML = """<!doctype html>
 <html lang="es"><head><meta charset="utf-8">
@@ -136,6 +150,12 @@ _PLAYER_HTML = """<!doctype html>
 
 
 def player_html(demo: Demo) -> str:
+    """Rellena la plantilla con el código Strudel y la ficha del demo.
+
+    El código va dos veces: como atributo del <strudel-editor>
+    (escapado para HTML) y en un <script type="text/plain"> de
+    respaldo para el botón COPIAR.
+    """
     code = to_strudel(demo)
     d = demo.normalized()
     meta = f"{d.title} · {d.bpm:g} bpm · {len(d.tracks)} pistas"
@@ -146,10 +166,15 @@ def player_html(demo: Demo) -> str:
 
 
 class StrudelServer:
-    """Sirve la página del player en 127.0.0.1 (hilo daemon)."""
+    """Sirve la página del player en 127.0.0.1 (hilo daemon).
+
+    Solo GET /: una página que se regenera con update() cuando la
+    TUI guarda cambios — el navegador recarga y sigue con su REPL.
+    """
 
     def __init__(self, demo: Demo, port: int = 0):
         self.html = player_html(demo)
+        # port=0 → el SO asigna un puerto libre (evita colisiones)
         self.httpd = ThreadingHTTPServer(("127.0.0.1", port), self._make_handler())
         self.port = self.httpd.server_address[1]
         self.url = f"http://127.0.0.1:{self.port}/"
@@ -158,6 +183,7 @@ class StrudelServer:
         self.thread.start()
 
     def _make_handler(self):
+        """Fábrica del handler: sirve outer.html con no-store (siempre fresco)."""
         outer = self
 
         class Handler(BaseHTTPRequestHandler):
@@ -176,12 +202,15 @@ class StrudelServer:
         return Handler
 
     def update(self, demo: Demo) -> None:
+        """Regenera la página (la TUI la llama al guardar el demo)."""
         self.html = player_html(demo)
 
     def stop(self) -> None:
+        """Apaga el servidor y libera el puerto."""
         self.httpd.shutdown()
         self.httpd.server_close()
 
 
 def launch_player(demo: Demo, port: int = 0) -> StrudelServer:
+    """Atajo: construye y arranca el servidor del player."""
     return StrudelServer(demo, port=port)

@@ -25,6 +25,7 @@ from . import __version__, __credits__
 
 
 def _load_or_exit(path: str) -> demoio.Demo:
+    """Carga un demo o mata la CLI con código 2 y el error en stderr."""
     try:
         return demoio.load(path)
     except demoio.DemoError as e:
@@ -33,38 +34,44 @@ def _load_or_exit(path: str) -> demoio.Demo:
 
 
 def cmd_play(args) -> None:
+    """`play`: renderiza el demo a WAV y lo reproduce con el reproductor del SO."""
     d = _load_or_exit(args.demo)
     path, samples = synth.render_to_cache(d)
     dur = len(samples) / synth.SR
     print(f"● {d.title} — {d.bpm:g} bpm · {len(d.tracks)} pistas · {dur:.1f}s")
-    print(f"  {synth.wave_preview(samples, 64)}")
+    print(f"  {synth.wave_preview(samples, 64)}")   # mini-osciloscopio en texto
     print(f"  wav: {path}")
     synth.play_file(path)
 
 
 def cmd_code(args) -> None:
+    """`code`: imprime el equivalente Strudel del demo (para copiar/pegar)."""
     print(strudelio.to_strudel(_load_or_exit(args.demo)), end="")
 
 
 def cmd_strudel(args) -> None:
+    """`strudel`: abre el demo en strudel.cc o en un player local (--page)."""
     d = _load_or_exit(args.demo)
     if args.page:
+        # player local: servidor con el editor strudel embebido y el demo cargado
         server = strudelio.launch_player(d, port=args.port)
         print(f"● player local → {server.url}   (ctrl+c para salir)")
         try:
             import time
             while True:
-                time.sleep(3600)
+                time.sleep(3600)   # el servidor corre en otro hilo
         except KeyboardInterrupt:
             server.stop()
             print("\n■ servidor cerrado")
     else:
+        # sin --page: link directo a strudel.cc con el patrón en la url
         url = strudelio.share_url(d)
         webbrowser.open(url)
         print(f"● strudel.cc listo (dale PLAY en el navegador):\n  {url}")
 
 
 def cmd_new(args) -> None:
+    """`new`: crea demos/NAME.py con una plantilla (--chip = 8-bit)."""
     d = demoio.chip_demo(args.name) if args.chip else demoio.default_demo(args.name)
     path = Path(settings.get("demo_dir", "demos")) / f"{demoio.slugify(args.name)}.py"
     demoio.save(d, path)
@@ -72,6 +79,7 @@ def cmd_new(args) -> None:
 
 
 def cmd_live(args) -> None:
+    """`live`: puente Ableton headless usando los puertos de la config."""
     d = _load_or_exit(args.demo)
     cfg = settings.load()
     live_bridge.run_headless(d,
@@ -80,6 +88,7 @@ def cmd_live(args) -> None:
 
 
 def cmd_list(args) -> None:
+    """`list`: los .py de la carpeta de demos, ordenados alfabéticamente."""
     demos = demoio.list_demos(settings.get("demo_dir", "demos"))
     if not demos:
         print("(sin demos — crea uno: oc1studio new mi-demo)")
@@ -89,8 +98,9 @@ def cmd_list(args) -> None:
 
 
 def cmd_git(args) -> None:
+    """`git <sub>`: cara CLI de gitops; clone va aparte (no necesita repo)."""
     if args.git_cmd == "clone":
-        dest = args.dest or gitops.default_dest(args.url)
+        dest = args.dest or gitops.default_dest(args.url)   # 'url/repo.git' → 'repo'
         out = gitops.clone(args.url, dest)
         print(f"● clonado → {out}")
         return
@@ -123,14 +133,16 @@ def cmd_git(args) -> None:
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """Define la gramática de la CLI: subcomandos + banderas de cada uno."""
     p = argparse.ArgumentParser(
         prog="oc1studio",
         description="OC-1 STUDIO — música en la terminal con estética Teenage Engineering.",
     )
     p.add_argument("--version", action="version",
                    version=f"OC-1 STUDIO v{__version__} · {__credits__}")
-    sub = p.add_subparsers(dest="cmd")
+    sub = p.add_subparsers(dest="cmd")   # cada subcomando genera su propio namespace
 
+    # — subcomandos de audio/strudel —
     c = sub.add_parser("play", help="reproduce un demo (.py)")
     c.add_argument("demo")
     c = sub.add_parser("code", help="imprime el código Strudel del demo")
@@ -138,7 +150,7 @@ def build_parser() -> argparse.ArgumentParser:
     c = sub.add_parser("strudel", help="abre el demo en strudel.cc")
     c.add_argument("demo")
     c.add_argument("--page", action="store_true", help="player local con REPL embebido")
-    c.add_argument("--port", type=int, default=0)
+    c.add_argument("--port", type=int, default=0)   # 0 = que el SO elija un puerto libre
     c = sub.add_parser("new", help="crea un demo nuevo")
     c.add_argument("name")
     c.add_argument("--chip", action="store_true", help="estilo 8-bit (computadora vieja)")
@@ -146,10 +158,12 @@ def build_parser() -> argparse.ArgumentParser:
     c.add_argument("demo")
     sub.add_parser("list", help="lista los demos")
 
+    # — subcomando git con sus propios subcomandos anidados —
     g = sub.add_parser("git", help="clone / status / commit / push / pull / add-remote")
     gs = g.add_subparsers(dest="git_cmd", required=True)
 
     def repo_opt(sp):
+        """Banderita -r/--repo común a todos los subcomandos git."""
         sp.add_argument("-r", "--repo", default=".", help="ruta del repositorio (por defecto: .)")
 
     gs.add_parser("status"); repo_opt(gs.choices["status"])
@@ -165,9 +179,14 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Punto de entrada de la CLI.
+
+    Sin subcomando → abre la TUI completa (el caso feliz: `oc1studio`).
+    Con subcomando → despacha a su cmd_* (el dict es la tabla de rutas).
+    """
     args = build_parser().parse_args(argv)
     if args.cmd is None:
-        from .app import OP1App
+        from .app import OP1App   # import tardío: no cargar Textual para `--version`
         OP1App().run()
         return 0
     return {"play": cmd_play, "code": cmd_code, "strudel": cmd_strudel,

@@ -3,15 +3,19 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
+# el paquete instalable: `pip install -e .` lo deja como `oc1studio`
 name = "oc1studio"
 version = "0.1.0"
 description = "OC-1 STUDIO — estudio de música en la terminal (estética Teenage Engineering) con Strudel, sintetizador local e integración git."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
+# única dependencia real: Textual (la TUI). el synth, git y UDP
+# funcionan con la stdlib — sin numpy, sin requests, nada.
 dependencies = ["textual>=1.0"]
 
 [project.scripts]
+# `pip install -e .` crea el comando `oc1studio` apuntando a cli.main()
 oc1studio = "oc1studio.cli:main"
 
 [tool.setuptools]
